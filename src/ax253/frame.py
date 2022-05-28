@@ -1,7 +1,7 @@
 """AX.25 frame encode/decode"""
 import enum
 import logging
-from typing import Iterable, Optional, Sequence, Union
+from typing import Any, Iterable, Optional, Sequence, Union
 
 import attr.validators
 from attrs import define, field
@@ -84,6 +84,12 @@ class Control:
     def _ftype_default(self):
         return FrameType.from_control_byte(self.v[0])
 
+    @classmethod
+    def from_any(cls, obj: Any) -> "Control":
+        if isinstance(obj, cls):
+            return obj
+        return Control(obj)
+
     @property
     def n_r(self) -> int:
         return self.v[0] >> 5
@@ -118,7 +124,7 @@ class Frame:
     destination: Address
     source: Address
     path: Sequence[Address]
-    control: Control = field(default=Control(UI_CONTROL_FIELD))
+    control: Control = field(default=Control(UI_CONTROL_FIELD), converter=Control.from_any)
     pid: Optional[bytes] = field(
         default=NO_PROTOCOL_ID,
         validator=attr.validators.optional(
