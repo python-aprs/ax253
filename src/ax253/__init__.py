@@ -1,6 +1,7 @@
 from importlib_metadata import version
 
 from .address import Address
+from .decode import GenericDecoder, FrameDecodeProtocol, SyncFrameDecode
 from .frame import AX25BytestreamDecoder, Control, Frame, FrameType
 
 __author__ = "Masen Furer KF7HVM <kf7hvm@0x26.net>"
@@ -13,7 +14,10 @@ __all__ = [
     "AX25BytestreamDecoder",
     "Control",
     "Frame",
+    "FrameDecodeProtocol",
     "FrameType",
+    "GenericDecoder",
+    "SyncFrameDecode",
     "__distribution__",
     "__version__",
 ]
