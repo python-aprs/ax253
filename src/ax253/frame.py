@@ -227,7 +227,8 @@ class AX25BytestreamDecoder(GenericDecoder[Frame]):
         :param frame: should represent a single higher level frame to
             decode in some way.
         """
-        yield Frame.from_bytes(frame)
+        if frame:
+            yield Frame.from_bytes(frame)
 
     def update(self, new_data: bytes) -> Iterable[Frame]:
         """
@@ -238,7 +239,7 @@ class AX25BytestreamDecoder(GenericDecoder[Frame]):
         """
         packet_start = 0
         data, self._last_pframe = self._last_pframe + new_data, b""
-        while 0 < (packet_start + 1) < len(data):
+        while 0 < (packet_start + 1) < len(data) or len(data) == 1:
             if data[packet_start] != AX25_FLAG:
                 _logger.debug(
                     "AX.25 frame did not start with flag {}, got {} "
@@ -247,7 +248,7 @@ class AX25BytestreamDecoder(GenericDecoder[Frame]):
                         bin(data[packet_start]),
                     )
                 )
-            while data[packet_start] == AX25_FLAG:
+            while (packet_start + 1) < len(data) and data[packet_start] == AX25_FLAG:
                 # consume flag bytes until data is reached
                 packet_start += 1
             # find the end of the packet
