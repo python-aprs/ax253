@@ -1,6 +1,19 @@
 """Generic deframing decoder."""
 import asyncio
-from typing import Callable, cast, Generic, Iterable, Optional, TypeVar
+from types import TracebackType
+from typing import (
+    Any,
+    AsyncIterable,
+    Callable,
+    cast,
+    Generic,
+    Iterable,
+    Optional,
+    Sequence,
+    SupportsBytes,
+    Type,
+    TypeVar,
+)
 
 from attrs import define, field
 
