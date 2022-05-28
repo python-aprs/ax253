@@ -120,9 +120,42 @@ def test_Frame_from_str(ax25_str, exp_frame):
         ),
         (
             [
+                b"\x82",
+                b"\xa0\xa4\xa6",
+                b"@@`\x9c",
+                b"`\x86\x82",
+                b"\x98\x98`\xae\x92\x88",
+                b"\x8ab@c\x03",
+                b"\xf0foo bar baz`",
+                b"\xa9~",
+            ],
+            [
+                Frame(
+                    destination=Address(
+                        callsign=b"APRS",
+                        ssid=0,
+                        digi=False,
+                        a7_hldc=False,
+                    ),
+                    source=Address(
+                        callsign=b"N0CALL",
+                        ssid=0,
+                        digi=False,
+                        a7_hldc=False,
+                    ),
+                    path=[Address(callsign=b"WIDE1", ssid=1, digi=False, a7_hldc=True)],
+                    control=Control(b"\x03"),
+                    pid=b"\xf0",
+                    info=b"foo bar baz",
+                ),
+            ],
+            None,
+        ),
+        (
+            [
                 (
                     b"~\x82\xa0\xa4\xa6@@`\x9c`\x86\x82\x98\x98`\xae\x92\x88\x8ab@c\x03\xf0foo bar baz`\xa9~"
-                    b"~\x82\xa0\xb4`lr`\x9c`\x86\x82\x98\x98`\xae\x92\x88\x8ab@b\x8c\x9e\x9e\x88\xa0@\xe1\x03\xf0digi'd 1\xcf\xcc~"
+                    b"~~~~~\x82\xa0\xb4`lr`\x9c`\x86\x82\x98\x98`\xae\x92\x88\x8ab@b\x8c\x9e\x9e\x88\xa0@\xe1\x03\xf0digi'd 1\xcf\xcc~"
                 )
             ],
             [
@@ -175,8 +208,42 @@ def test_Frame_from_str(ax25_str, exp_frame):
             [],
             "FCS did not match for",
         ),
+        (
+            [
+                b"~\x82\xa0\xa4\xa6@@`\x9c`\x86\x82\x98\x98`\xae\x92\x88\x8ab@c\x03\xf0foo bar baz`\xa9~~~~~~~~",
+            ],
+            [
+                Frame(
+                    destination=Address(
+                        callsign=b"APRS",
+                        ssid=0,
+                        digi=False,
+                        a7_hldc=False,
+                    ),
+                    source=Address(
+                        callsign=b"N0CALL",
+                        ssid=0,
+                        digi=False,
+                        a7_hldc=False,
+                    ),
+                    path=[Address(callsign=b"WIDE1", ssid=1, digi=False, a7_hldc=True)],
+                    control=Control(b"\x03"),
+                    pid=b"\xf0",
+                    info=b"foo bar baz",
+                ),
+            ],
+            None,
+        ),
     ),
-    ids=["single frame", "truncated frame", "split frame", "2 frames", "bad fcs"],
+    ids=[
+        "single frame",
+        "truncated frame",
+        "split frame",
+        "split frame no lead",
+        "2 frames",
+        "bad fcs",
+        "extra trailers",
+    ],
 )
 def test_AX25BytestreamDecoder(chunks, exp_frames, exp_exception):
     decoded_frames = []
