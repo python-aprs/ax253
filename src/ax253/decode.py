@@ -73,8 +73,8 @@ class FrameDecodeProtocol(asyncio.Protocol, Generic[_T]):
     )
 
     def _queue_frame(self, frame: _T) -> None:
-        self.frames.put_nowait(frame)
         self.frame_decoded(frame)
+        self.frames.put_nowait(frame)
 
     def connection_made(self, transport: asyncio.Transport) -> None:
         """
@@ -119,7 +119,7 @@ class FrameDecodeProtocol(asyncio.Protocol, Generic[_T]):
             frame = await self.frames.get()
             if frame is EOF:
                 break
-            if callback:
+            if callback is not None:
                 callback(frame)
             yield frame
             n_frames -= 1
