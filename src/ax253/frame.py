@@ -3,9 +3,8 @@ import enum
 import logging
 from typing import Any, Iterable, Optional, Sequence, Union
 
-import attr.validators
 from attrs import define, field
-from attr import validators
+from attr import converters, validators
 from bitarray import bitarray
 
 from . import util
@@ -125,10 +124,10 @@ class Frame:
     control: Control = field(default=Control(UI_CONTROL_FIELD), converter=Control.from_any)
     pid: Optional[bytes] = field(
         default=NO_PROTOCOL_ID,
-        validator=attr.validators.optional(
+        validator=validators.optional(
             util.valid_length(1, 1, validators.instance_of(bytes)),
         ),
-        converter=attr.converters.optional(bytes_from_int),
+        converter=converters.optional(bytes_from_int),
     )
     info: bytes = field(default=b"", converter=bytes_or_encode_utf8)
 
