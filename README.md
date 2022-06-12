@@ -36,4 +36,4 @@ Copyright 2017 Greg Albrecht and Contributors
 
 ## License
 
-Apache License, Version 2.0. See `LICENSE <./LICENSE>`_ for details.
+Apache License, Version 2.0. See [`LICENSE`](./LICENSE) for details.
