@@ -71,17 +71,15 @@ class Control:
         validator=util.valid_length(1, 1, validators.instance_of(bytes)),
         converter=bytes_from_int,
     )
-    bv: bitarray = field(init=False)
-    ftype: FrameType = field(init=False)
 
-    @bv.default
-    def _bv_default(self):
+    @property
+    def bv(self) -> bitarray:
         bv = bitarray()
         bv.frombytes(self.v)
         return bv
 
-    @ftype.default
-    def _ftype_default(self):
+    @property
+    def ftype(self) -> FrameType:
         return FrameType.from_control_byte(self.v[0])
 
     @classmethod
