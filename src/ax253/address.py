@@ -24,15 +24,20 @@ def valid_callsign(instance, attribute, value):
 
 @define(slots=True, frozen=True)
 class Address:
-    """AX.25-encoded callsign."""
+    """A source, destination, or path entry in an AX.25 frame."""
 
     callsign: bytes = field(converter=lambda c: c.upper(), validator=valid_callsign)
+    """The callsign associated with the address."""
     ssid: int = field(default=0, converter=int)
+    """The ssid (0-15) extension of the callsign."""
     digi: bool = field(default=False, converter=bool)
+    """If true, indicates that this address has digipeated the packet."""
+    # The high order bit of HLDC; True indicates end of address information.
     a7_hldc: bool = field(default=False, converter=bool, repr=False)
 
     @classmethod
     def from_bytes(cls, ax25_address: bytes, **kwargs: Any) -> "Address":
+        """Create an address from ax25 bytes."""
         if len(ax25_address) != 7:
             raise ValueError(
                 "ax25 address must be 7 bytes, got {}".format(len(ax25_address))
@@ -58,6 +63,7 @@ class Address:
     def from_str(
         cls, address_spec: str, a7_hldc: bool = False, **kwargs: Any,
     ) -> "Address":
+        """Create an address from a string (TNC2 format)."""
         digi = "*" in address_spec
         address = address_spec.strip("*")
         callsign_str, found, ssid_str = address.partition("-")
@@ -78,6 +84,7 @@ class Address:
     def from_any(
         cls, address: Union["Address", bytes, str], **kwargs: Any,
     ) -> "Address":
+        """Create an address from any supported value."""
         if isinstance(address, cls):
             if kwargs:
                 address = address.evolve(**kwargs)
@@ -87,6 +94,7 @@ class Address:
         return cls.from_str(str(address), **kwargs)
 
     def __str__(self) -> str:
+        """Encode address as TNC2 string."""
         return "".join(
             [
                 self.callsign.decode("latin1"),
@@ -98,6 +106,7 @@ class Address:
         )
 
     def __bytes__(self) -> bytes:
+        """Encode address as ax25 bytes."""
         if len(self.callsign) > 6:
             raise ValueError(
                 "Cannot encode callsign > 6 bytes: {}".format(self.callsign)
@@ -111,4 +120,5 @@ class Address:
         return callsign + a7.tobytes()
 
     def evolve(self, **kwargs) -> "Address":
+        """Create a new Address by applying kwargs to this Address."""
         return attr.evolve(self, **kwargs)
