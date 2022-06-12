@@ -36,7 +36,8 @@ class TNC2Decode(GenericDecoder[Frame]):
             if packet.strip().startswith(b"#"):
                 log.debug(packet)  # log comment
                 continue
-            yield from self.decode_frames(packet)
+            if packet:
+                yield from self.decode_frames(packet)
 
 
 @define
