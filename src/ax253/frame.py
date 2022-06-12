@@ -66,6 +66,7 @@ def bytes_from_int(b_or_i) -> bytes:
 
 @define(frozen=True, slots=True)
 class Control:
+    """The Frame control byte, indicates FrameType and PID"""
     v: bytes = field(
         validator=util.valid_length(1, 1, validators.instance_of(bytes)),
         converter=bytes_from_int,
@@ -79,6 +80,7 @@ class Control:
 
     @property
     def ftype(self) -> FrameType:
+        """The FrameType associated with this Control byte."""
         return FrameType.from_control_byte(self.v[0])
 
     @classmethod
