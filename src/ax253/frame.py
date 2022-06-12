@@ -152,12 +152,12 @@ class Frame:
         """
         Decode the frame from AX.25 bytes.
         """
-        destination = Address.from_ax25(ax25_bytes[:7])
-        source = last_address = Address.from_ax25(ax25_bytes[7:14])
+        destination = Address.from_bytes(ax25_bytes[:7])
+        source = last_address = Address.from_bytes(ax25_bytes[7:14])
         path = []
         path_start = 14
         while not last_address.a7_hldc:
-            last_address = Address.from_ax25(ax25_bytes[path_start : path_start + 7])
+            last_address = Address.from_bytes(ax25_bytes[path_start : path_start + 7])
             path.append(last_address)
             path_start += 7
         info_start = control_end = path_start + cls.CONTROL_SIZE
@@ -195,11 +195,10 @@ class Frame:
         source_text, gt, rem = ax25_text.partition(">")
         address_field, colon, info_text = rem.partition(":")
         destination_text, *paths_text = address_field.split(",")
-        path = [Address.from_text(p) for p in paths_text]
         return cls.ui(
             destination=destination_text,
             source=source_text,
-            path=path,
+            path=paths_text,
             info=info_text.encode("latin1"),
         )
 
