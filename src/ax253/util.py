@@ -36,6 +36,7 @@ def instance_of_or(types, other_validator):
 
 
 def optional_bool_or_bytes(v):
+    """pass through None and bool; otherwise cast as `bytes`."""
     if v is not None and not isinstance(v, bool):
         return bytes(v)
     return v
