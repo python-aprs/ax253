@@ -3,9 +3,8 @@ import enum
 import logging
 from typing import Any, Iterable, Optional, Sequence, Union
 
-import attr.validators
 from attrs import define, field
-from attr import validators
+from attr import converters, validators
 from bitarray import bitarray
 
 from . import util
@@ -71,17 +70,15 @@ class Control:
         validator=util.valid_length(1, 1, validators.instance_of(bytes)),
         converter=bytes_from_int,
     )
-    bv: bitarray = field(init=False)
-    ftype: FrameType = field(init=False)
 
-    @bv.default
-    def _bv_default(self):
+    @property
+    def bv(self) -> bitarray:
         bv = bitarray()
         bv.frombytes(self.v)
         return bv
 
-    @ftype.default
-    def _ftype_default(self):
+    @property
+    def ftype(self) -> FrameType:
         return FrameType.from_control_byte(self.v[0])
 
     @classmethod
@@ -127,10 +124,10 @@ class Frame:
     control: Control = field(default=Control(UI_CONTROL_FIELD), converter=Control.from_any)
     pid: Optional[bytes] = field(
         default=NO_PROTOCOL_ID,
-        validator=attr.validators.optional(
+        validator=validators.optional(
             util.valid_length(1, 1, validators.instance_of(bytes)),
         ),
-        converter=attr.converters.optional(bytes_from_int),
+        converter=converters.optional(bytes_from_int),
     )
     info: bytes = field(default=b"", converter=bytes_or_encode_utf8)
 
@@ -155,12 +152,12 @@ class Frame:
         """
         Decode the frame from AX.25 bytes.
         """
-        destination = Address.from_ax25(ax25_bytes[:7])
-        source = last_address = Address.from_ax25(ax25_bytes[7:14])
+        destination = Address.from_bytes(ax25_bytes[:7])
+        source = last_address = Address.from_bytes(ax25_bytes[7:14])
         path = []
         path_start = 14
         while not last_address.a7_hldc:
-            last_address = Address.from_ax25(ax25_bytes[path_start : path_start + 7])
+            last_address = Address.from_bytes(ax25_bytes[path_start : path_start + 7])
             path.append(last_address)
             path_start += 7
         info_start = control_end = path_start + cls.CONTROL_SIZE
@@ -198,11 +195,10 @@ class Frame:
         source_text, gt, rem = ax25_text.partition(">")
         address_field, colon, info_text = rem.partition(":")
         destination_text, *paths_text = address_field.split(",")
-        path = [Address.from_text(p) for p in paths_text]
         return cls.ui(
             destination=destination_text,
             source=source_text,
-            path=path,
+            path=paths_text,
             info=info_text.encode("latin1"),
         )
 

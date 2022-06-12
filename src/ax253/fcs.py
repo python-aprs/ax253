@@ -55,9 +55,12 @@ class FCS:
                 self.update_bit((byte >> i) & 0x01 == 1)
         return self
 
-    def digest(self):
+    def digest(self) -> bytes:
         return struct.pack("<H", ~self.fcs % 2**16)
 
     @classmethod
     def from_bytes(cls, packet: bytes) -> "FCS":
         return FCS().update(packet)
+
+    def __bytes__(self) -> bytes:
+        return self.digest()

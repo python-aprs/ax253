@@ -29,7 +29,7 @@ class Address:
     callsign: bytes = field(converter=lambda c: c.upper(), validator=valid_callsign)
     ssid: int = field(default=0, converter=int)
     digi: bool = field(default=False, converter=bool)
-    a7_hldc: bool = field(default=False, converter=bool)
+    a7_hldc: bool = field(default=False, converter=bool, repr=False)
 
     @classmethod
     def from_bytes(cls, ax25_address: bytes, **kwargs: Any) -> "Address":
@@ -54,11 +54,9 @@ class Address:
             init_kwargs.update(kwargs)
         return cls(**init_kwargs)
 
-    from_ax25 = from_bytes
-
     @classmethod
     def from_str(
-        cls, address_spec: str, a7_hldc: bool = False, **kwargs: Any
+        cls, address_spec: str, a7_hldc: bool = False, **kwargs: Any,
     ) -> "Address":
         digi = "*" in address_spec
         address = address_spec.strip("*")
@@ -76,11 +74,9 @@ class Address:
             init_kwargs.update(**kwargs)
         return cls(**init_kwargs)
 
-    from_text = from_str
-
     @classmethod
     def from_any(
-        cls, address: Union["Address", bytes, str], **kwargs: Any
+        cls, address: Union["Address", bytes, str], **kwargs: Any,
     ) -> "Address":
         if isinstance(address, cls):
             if kwargs:
