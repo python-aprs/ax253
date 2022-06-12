@@ -1,0 +1,33 @@
+.package create: /private/var/folders/5z/zrfn8mrs2yj5cckpwyry7btm0000gn/T/tmpcf5ubup9/.tox/.package
+.package installdeps: setuptools>=61, setuptools_scm[toml]>=6.2, wheel
+doc create: /private/var/folders/5z/zrfn8mrs2yj5cckpwyry7btm0000gn/T/tmpcf5ubup9/.tox/doc
+doc installdeps: sphinx ~= 5.0.1, sphinx-rtd-theme ~= 1.0.0
+doc inst: /private/var/folders/5z/zrfn8mrs2yj5cckpwyry7btm0000gn/T/tmpcf5ubup9/.tox/.tmp/package/1/ax253-0.1.5.tar.gz
+doc installed: alabaster==0.7.12,attrs==21.4.0,ax253 @ file:///private/var/folders/5z/zrfn8mrs2yj5cckpwyry7btm0000gn/T/tmpcf5ubup9/.tox/.tmp/package/1/ax253-0.1.5.tar.gz,Babel==2.10.1,bitarray==2.5.1,certifi==2022.5.18.1,charset-normalizer==2.0.12,docutils==0.17.1,idna==3.3,imagesize==1.3.0,importlib-metadata==4.11.4,Jinja2==3.1.2,MarkupSafe==2.1.1,packaging==21.3,Pygments==2.12.0,pyparsing==3.0.9,pytz==2022.1,requests==2.28.0,snowballstemmer==2.2.0,Sphinx==5.0.1,sphinx-rtd-theme==1.0.0,sphinxcontrib-applehelp==1.0.2,sphinxcontrib-devhelp==1.0.2,sphinxcontrib-htmlhelp==2.0.0,sphinxcontrib-jsmath==1.0.1,sphinxcontrib-qthelp==1.0.3,sphinxcontrib-serializinghtml==1.1.5,urllib3==1.26.9,zipp==3.8.0
+doc run-test-pre: PYTHONHASHSEED='784292901'
+doc run-test: commands[0] | sphinx-build -b html doc /Users/masen/code/python-aprs/ax253/v0.1.5
+Running Sphinx v5.0.1
+WARNING: html_static_path entry '_static' does not exist
+building [mo]: targets for 0 po files that are out of date
+building [html]: targets for 1 source files that are out of date
+updating environment: [new config] 1 added, 0 changed, 0 removed
+reading sources... [100%] index
+
+looking for now-outdated files... none found
+pickling environment... done
+checking consistency... done
+preparing documents... done
+writing output... [100%] index
+
+generating indices... genindex done
+writing additional pages... search done
+copying static files... done
+copying extra files... done
+dumping search index in English (code: en)... done
+dumping object inventory... done
+build succeeded, 1 warning.
+
+The HTML pages are in ../../../../../../../Users/masen/code/python-aprs/ax253/v0.1.5.
+___________________________________ summary ____________________________________
+  doc: commands succeeded
+  congratulations :)
