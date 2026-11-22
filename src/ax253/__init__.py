@@ -1,4 +1,4 @@
-from importlib_metadata import version
+from importlib.metadata import version
 
 from .address import Address
 from .decode import GenericDecoder, FrameDecodeProtocol, SyncFrameDecode
