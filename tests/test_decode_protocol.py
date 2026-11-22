@@ -13,6 +13,7 @@ from ax253 import (
     TNC2Decode,
     TNC2Protocol,
 )
+from ax253.decode import EOF
 
 LINES = [b"N0CALL>APRS:>one", b"N0CALL>APRS:>two", b"N0CALL>APRS:>three"]
 
@@ -322,3 +323,37 @@ def test_sync_wrapper_connected_tracks_peer_close():
     assert not tnc.connected
     tnc.stop()
     assert not tnc.connected
+
+
+# --- issue #21: the receive queue is bounded ---
+
+
+def test_protocol_queue_drops_oldest(caplog):
+    async def main():
+        p = FrameDecodeProtocol(max_queued_frames=3)
+        for i in range(5):
+            p.data_received(bytes([i]))
+        p.connection_lost(None)
+        items = []
+        while not p.frames.empty():
+            items.append(p.frames.get_nowait())
+        return p, items
+
+    with caplog.at_level("WARNING", logger="ax253.decode"):
+        p, items = asyncio.run(main())
+    assert items[:3] == [b"\x02", b"\x03", b"\x04"]
+    assert items[3:] == [EOF]  # EOF is never dropped
+    assert p.dropped_frames == 2
+    assert "Receive queue full" in caplog.text
+
+
+def test_protocol_queue_unbounded():
+    async def main():
+        p = FrameDecodeProtocol(max_queued_frames=None)
+        for i in range(20):
+            p.data_received(bytes([i]))
+        return p
+
+    p = asyncio.run(main())
+    assert p.frames.qsize() == 20
+    assert p.dropped_frames == 0
