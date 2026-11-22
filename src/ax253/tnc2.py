@@ -1,9 +1,8 @@
 """asyncio Protocol for extracting individual frames from CRLF-delimited TNC2."""
 
+import dataclasses
 import logging
 from collections.abc import Iterable
-
-from attrs import define, field
 
 from .decode import FrameDecodeProtocol, GenericDecoder
 from .frame import Frame
@@ -16,7 +15,7 @@ __license__ = "Apache License, Version 2.0"
 log = logging.getLogger(__name__)
 
 
-@define
+@dataclasses.dataclass
 class TNC2Decode(GenericDecoder[Frame]):
     """
     Decode packets in CR-LF delimited TNC2 monitor format.
@@ -28,7 +27,7 @@ class TNC2Decode(GenericDecoder[Frame]):
     its terminator arrives, or until ``flush()``.
     """
 
-    _buffer: bytes = field(default=b"", init=False, repr=False)
+    _buffer: bytes = dataclasses.field(default=b"", init=False, repr=False)
 
     @staticmethod
     def decode_frames(frame: bytes) -> Iterable[Frame]:
@@ -62,11 +61,11 @@ class TNC2Decode(GenericDecoder[Frame]):
         yield from self._decode_line(buffered)
 
 
-@define
+@dataclasses.dataclass
 class TNC2Protocol(FrameDecodeProtocol[Frame]):
     """Protocol for decoding a stream of TNC2 format packets."""
 
-    decoder: TNC2Decode = field(factory=TNC2Decode)
+    decoder: TNC2Decode = dataclasses.field(default_factory=TNC2Decode)
 
     def write(self, frame: Frame) -> None:
         """Write the Frame to the transport."""

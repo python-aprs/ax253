@@ -29,18 +29,17 @@ OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 """
 
+import dataclasses
 import struct
-
-from attrs import define, field
 
 __author__ = "Christopher H. Casebeer"
 __copyright__ = "Copyright (c) 2013 Christopher H. Casebeer. All rights reserved."
 __license__ = "BSD 2-clause Simplified License"
 
 
-@define
+@dataclasses.dataclass
 class FCS:
-    fcs: int = field(default=0xFFFF)
+    fcs: int = 0xFFFF
 
     def update_bit(self, bit) -> "FCS":
         check = self.fcs & 0x1 == 1

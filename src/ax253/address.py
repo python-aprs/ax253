@@ -1,11 +1,9 @@
 """AX.25 address encode/decode"""
 
+import dataclasses
 import re
 from typing import Any, Union
 
-import attr.validators
-from attr import validators
-from attrs import define, field
 from bitarray import bitarray
 
 __author__ = "Masen Furer KF7HVM <kf7hvm@0x26.net>"
@@ -22,34 +20,44 @@ AX25_CALLSIGN_REX = re.compile(rb"^[A-Z0-9]{1,6}$")
 AX25_SSIDS = frozenset(str(n) for n in range(16))
 
 
-def valid_callsign(instance, attribute, value):
-    validators.instance_of(bytes)(instance, attribute, value)
+def valid_callsign(value: Any) -> bytes:
+    if not isinstance(value, bytes):
+        raise TypeError(f"callsign must be bytes, got {value!r}")
     if not VALID_CALLSIGN_REX.match(value):
         raise ValueError(f"{value!r} does not match {VALID_CALLSIGN_REX!r}")
+    return value
 
 
-def valid_ssid(instance, attribute, value):
+def valid_ssid(value: Any) -> int:
+    value = int(value)
     if not 0 <= value <= 15:
         raise ValueError(f"ssid must be 0-15, got {value!r}")
+    return value
 
 
-@define(slots=True, frozen=True)
+@dataclasses.dataclass(frozen=True)
 class Address:
     """A source, destination, or path entry in an AX.25 frame."""
 
-    callsign: bytes = field(validator=valid_callsign)
+    callsign: bytes
     """
     The callsign associated with the address, case preserved.
 
     For APRS-IS addresses whose SSID is not a number 0-15 (e.g. "KJ4ABC-B"),
     the whole text is kept here and ``ssid`` is 0.
     """
-    ssid: int = field(default=0, converter=int, validator=valid_ssid)
+    ssid: int = 0
     """The ssid (0-15) extension of the callsign."""
-    digi: bool = field(default=False, converter=bool)
+    digi: bool = False
     """If true, indicates that this address has digipeated the packet."""
     # The high order bit of HLDC; True indicates end of address information.
-    a7_hldc: bool = field(default=False, converter=bool, repr=False)
+    a7_hldc: bool = dataclasses.field(default=False, repr=False)
+
+    def __post_init__(self) -> None:
+        object.__setattr__(self, "callsign", valid_callsign(self.callsign))
+        object.__setattr__(self, "ssid", valid_ssid(self.ssid))
+        object.__setattr__(self, "digi", bool(self.digi))
+        object.__setattr__(self, "a7_hldc", bool(self.a7_hldc))
 
     @classmethod
     def from_bytes(cls, ax25_address: bytes, **kwargs: Any) -> "Address":
@@ -63,7 +71,7 @@ class Address:
         c_or_h = a7[0]
         r = a7[1:3]  # noqa: F841
         hldc = a7[7]
-        init_kwargs = dict(
+        init_kwargs: dict[str, Any] = dict(
             callsign=callsign,
             ssid=ssid,
             # For digipeater addresses bit 7 is the H ("has been repeated")
@@ -96,7 +104,7 @@ class Address:
             # not representable in AX.25 (e.g. "KJ4ABC-B", "N0CALL-16",
             # "N0CALL-01"): keep the text verbatim
             callsign, ssid = address.encode("latin1"), 0
-        init_kwargs = dict(
+        init_kwargs: dict[str, Any] = dict(
             callsign=callsign,
             ssid=ssid,
             digi=digi,
@@ -151,4 +159,4 @@ class Address:
 
     def evolve(self, **kwargs) -> "Address":
         """Create a new Address by applying kwargs to this Address."""
-        return attr.evolve(self, **kwargs)
+        return dataclasses.replace(self, **kwargs)

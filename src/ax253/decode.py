@@ -2,17 +2,17 @@
 
 import abc
 import asyncio
+import dataclasses
 from collections.abc import AsyncIterable, Callable, Iterable, Sequence
 from types import TracebackType
 from typing import (
     Any,
+    ClassVar,
     Generic,
     SupportsBytes,
     TypeVar,
     cast,
 )
-
-from attrs import define, field
 
 __author__ = "Masen Furer KF7HVM <kf7hvm@0x26.net>"
 __copyright__ = "Copyright 2022 Masen Furer and Contributors"
@@ -26,7 +26,7 @@ EOF = object()
 _T = TypeVar("_T")
 
 
-@define
+@dataclasses.dataclass
 class GenericDecoder(Generic[_T]):
     """Generic stateful decoder."""
 
@@ -56,16 +56,17 @@ class GenericDecoder(Generic[_T]):
         return
 
 
-@define
+@dataclasses.dataclass
 class FrameDecodeProtocol(asyncio.Protocol, Generic[_T]):
     """Protocol which uses a GenericDecoder to split the stream into frames."""
 
-    transport: asyncio.Transport | None = field(default=None)
-    decoder: GenericDecoder[_T] = field(factory=GenericDecoder)
-    frames: asyncio.Queue = field(factory=asyncio.Queue, init=False)
-    connection_future: asyncio.Future = field(
-        factory=asyncio.Future,
-        init=False,
+    transport: asyncio.Transport | None = None
+    decoder: GenericDecoder[_T] = dataclasses.field(default_factory=GenericDecoder)
+    frames: asyncio.Queue = dataclasses.field(
+        default_factory=asyncio.Queue, init=False, repr=False
+    )
+    connection_future: asyncio.Future = dataclasses.field(
+        default_factory=asyncio.Future, init=False, repr=False
     )
 
     def _queue_frame(self, frame: _T) -> None:
@@ -147,7 +148,7 @@ class FrameDecodeProtocol(asyncio.Protocol, Generic[_T]):
         self.transport.write(bytes(frame))
 
 
-@define
+@dataclasses.dataclass
 class SyncFrameDecode(abc.ABC, Generic[_T]):
     """
     Synchronous wrapper over FrameDecodeProtocol.
@@ -156,10 +157,12 @@ class SyncFrameDecode(abc.ABC, Generic[_T]):
     start/stop functionality.
     """
 
-    _loop = None
+    _loop: ClassVar[asyncio.AbstractEventLoop | None] = None
     """The asyncio event loop that this class and subclasses will use."""
 
-    _protocol: FrameDecodeProtocol[_T] | None = field(default=None)
+    _protocol: FrameDecodeProtocol[_T] | None = dataclasses.field(
+        default=None, init=False, repr=False
+    )
     """The connected protocol (access via .protocol property)."""
 
     @property

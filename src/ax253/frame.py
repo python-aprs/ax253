@@ -1,15 +1,13 @@
 """AX.25 frame encode/decode"""
 
+import dataclasses
 import enum
 import logging
 from collections.abc import Iterable, Sequence
-from typing import Any
+from typing import Any, ClassVar
 
-from attr import converters, validators
-from attrs import define, field
 from bitarray import bitarray
 
-from . import util
 from .address import Address
 from .decode import GenericDecoder
 from .fcs import FCS
@@ -65,14 +63,21 @@ def bytes_from_int(b_or_i) -> bytes:
     return bytes(b_or_i)
 
 
-@define(frozen=True, slots=True)
+def single_byte(name: str, value: Any) -> bytes:
+    value = bytes_from_int(value)
+    if len(value) != 1:
+        raise ValueError(f"{name} must be exactly 1 byte (actual={len(value)})")
+    return value
+
+
+@dataclasses.dataclass(frozen=True)
 class Control:
     """The Frame control byte, indicates FrameType and PID"""
 
-    v: bytes = field(
-        validator=util.valid_length(1, 1, validators.instance_of(bytes)),
-        converter=bytes_from_int,
-    )
+    v: bytes
+
+    def __post_init__(self) -> None:
+        object.__setattr__(self, "v", single_byte("v", self.v))
 
     @property
     def bv(self) -> bitarray:
@@ -114,29 +119,32 @@ def bytes_or_encode_utf8(v):
     return str(v).encode("utf-8")
 
 
-@define(frozen=True, slots=True)
+@dataclasses.dataclass(frozen=True)
 class Frame:
     """
     An AX.25 Frame.
     """
 
     # how large the `control` field is: 1 byte for UN frames
-    CONTROL_SIZE = 1
+    CONTROL_SIZE: ClassVar[int] = 1
 
     destination: Address
     source: Address
     path: Sequence[Address]
-    control: Control = field(
-        default=Control(UI_CONTROL_FIELD), converter=Control.from_any
-    )
-    pid: bytes | None = field(
-        default=NO_PROTOCOL_ID,
-        validator=validators.optional(
-            util.valid_length(1, 1, validators.instance_of(bytes)),
-        ),
-        converter=converters.optional(bytes_from_int),
-    )
-    info: bytes = field(default=b"", converter=bytes_or_encode_utf8)
+    control: Control = Control(UI_CONTROL_FIELD)
+    pid: bytes | None = NO_PROTOCOL_ID
+    info: bytes = b""
+
+    def __post_init__(self) -> None:
+        object.__setattr__(self, "control", Control.from_any(self.control))
+        if self.pid is not None:
+            object.__setattr__(self, "pid", single_byte("pid", self.pid))
+        object.__setattr__(self, "info", self._convert_info(self.info))
+
+    @staticmethod
+    def _convert_info(info: Any) -> Any:
+        """Subclasses may override to decode the information field."""
+        return bytes_or_encode_utf8(info)
 
     @classmethod
     def ui(
@@ -244,11 +252,11 @@ class Frame:
         )
 
 
-@define
+@dataclasses.dataclass
 class AX25BytestreamDecoder(GenericDecoder[Frame]):
     """Decode a generic AX25_FLAG delimited bytestream"""
 
-    _last_pframe: bytes = field(default=b"", init=False)
+    _last_pframe: bytes = dataclasses.field(default=b"", init=False, repr=False)
 
     @staticmethod
     def decode_frames(frame: bytes) -> Iterable[Frame]:
