@@ -50,8 +50,11 @@ class FCS:
         return self
 
     def update(self, data: bytes) -> "FCS":
+        # AX.25 sends each octet least-significant bit first, and the FCS
+        # (CRC-16/X.25, reflected polynomial 0x8408) is computed in that
+        # same order.
         for byte in data:
-            for i in range(7, -1, -1):
+            for i in range(8):
                 self.update_bit((byte >> i) & 0x01 == 1)
         return self
 
