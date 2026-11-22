@@ -44,8 +44,8 @@ def encode(packet: str, tmp: pathlib.Path) -> dict:
     out = ANSI.sub(
         "",
         subprocess.run(
-            ["atest", "-h", str(wav)], capture_output=True, text=True, check=True
-        ).stdout,
+            ["atest", "-h", str(wav)], capture_output=True, check=True
+        ).stdout.decode("latin1"),
     )
     monitor = None
     hex_bytes = []
