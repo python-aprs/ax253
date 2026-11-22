@@ -35,7 +35,7 @@ def valid_ssid(value: Any) -> int:
     return value
 
 
-@dataclasses.dataclass(frozen=True)
+@dataclasses.dataclass(frozen=True, slots=True)
 class Address:
     """A source, destination, or path entry in an AX.25 frame."""
 

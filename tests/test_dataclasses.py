@@ -78,3 +78,10 @@ def test_frame_subclass_can_convert_info():
     f = UpperFrame.from_str("N0CALL>APZ069:hello")
     assert isinstance(f, UpperFrame)
     assert f.info == b"HELLO"
+
+
+def test_value_types_are_slotted():
+    # these are created per frame and per address; no per-instance __dict__
+    frame = Frame.from_str("N0CALL>APZ069,WIDE1-1:hello")
+    for obj in (frame, frame.source, frame.path[0], frame.control):
+        assert not hasattr(obj, "__dict__"), type(obj)

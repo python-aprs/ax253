@@ -70,7 +70,7 @@ def single_byte(name: str, value: Any) -> bytes:
     return value
 
 
-@dataclasses.dataclass(frozen=True)
+@dataclasses.dataclass(frozen=True, slots=True)
 class Control:
     """The Frame control byte, indicates FrameType and PID"""
 
@@ -119,7 +119,7 @@ def bytes_or_encode_utf8(v):
     return str(v).encode("utf-8")
 
 
-@dataclasses.dataclass(frozen=True)
+@dataclasses.dataclass(frozen=True, slots=True)
 class Frame:
     """
     An AX.25 Frame.
