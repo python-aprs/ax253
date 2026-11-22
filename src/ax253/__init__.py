@@ -1,3 +1,10 @@
+"""AX.25 frames and the TNC2 text format.
+
+``Frame`` encodes and decodes AX.25 frames, ``Address`` handles callsigns
+and SSIDs, and the stream decoders split raw bytes or TNC2 lines into
+frames.
+"""
+
 from importlib.metadata import version
 
 from .address import Address
