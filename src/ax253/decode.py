@@ -156,22 +156,43 @@ class SyncFrameDecode(abc.ABC, Generic[_T]):
     start/stop functionality.
     """
 
-    _loop = None
-    """The asyncio event loop that this class and subclasses will use."""
-
     _protocol: FrameDecodeProtocol[_T] | None = field(default=None)
     """The connected protocol (access via .protocol property)."""
 
+    _loop: asyncio.AbstractEventLoop | None = field(default=None, init=False, repr=False)
+    """This instance's event loop (access via .loop property)."""
+
+    _owns_loop: bool = field(default=False, init=False, repr=False)
+    """True when the loop was created here and should be closed with us."""
+
     @property
-    def loop(self) -> asyncio.BaseEventLoop:
-        """Get a reference to a shared event loop for this class."""
-        if SyncFrameDecode._loop is None:
+    def loop(self) -> asyncio.AbstractEventLoop:
+        """
+        Get the event loop that this instance runs its connection on.
+
+        Each instance gets its own loop, so instances can be used from
+        different threads at the same time. Inside a running loop, that
+        loop is used instead. A loop created here is closed when the
+        instance is garbage collected.
+        """
+        if self._loop is None or self._loop.is_closed():
             try:
-                SyncFrameDecode._loop = asyncio.get_running_loop()
+                self._loop = asyncio.get_running_loop()
+                self._owns_loop = False
             except RuntimeError:
-                SyncFrameDecode._loop = asyncio.new_event_loop()
-                asyncio.set_event_loop(SyncFrameDecode._loop)
-        return SyncFrameDecode._loop
+                self._loop = asyncio.new_event_loop()
+                self._owns_loop = True
+                # as before: code in this thread that calls get_event_loop()
+                # (e.g. constructing a protocol outside a coroutine) finds it
+                asyncio.set_event_loop(self._loop)
+        return self._loop
+
+    def _close_loop(self) -> None:
+        """Close the event loop if this instance created it."""
+        loop, self._loop = self._loop, None
+        if self._owns_loop and loop is not None and not loop.is_running():
+            loop.close()
+        self._owns_loop = False
 
     @property
     def protocol(self) -> FrameDecodeProtocol[_T]:
@@ -180,6 +201,23 @@ class SyncFrameDecode(abc.ABC, Generic[_T]):
                 "Underlying connection is not active. Hint: did you call start()?",
             )
         return self._protocol
+
+    @property
+    def connected(self) -> bool:
+        """
+        True while the connection is open.
+
+        Becomes False after stop(), or once the peer closes the connection
+        or the device goes away (a blocking read() then returns early with
+        whatever frames were left). Frames already received can still be
+        read after that. A TCP peer that vanishes without closing (cable
+        pulled, host crashed) is only noticed once a write fails or TCP
+        keepalive gives up.
+        """
+        protocol = self._protocol
+        if protocol is None or protocol.transport is None:
+            return False
+        return not protocol.transport.is_closing()
 
     @protocol.setter
     def protocol(self, p) -> None:
@@ -202,7 +240,16 @@ class SyncFrameDecode(abc.ABC, Generic[_T]):
         return self.stop()
 
     def __del__(self) -> None:
-        return self.stop()
+        # a destructor must never raise, even on an object whose __init__
+        # or start() failed part way (or during interpreter shutdown)
+        try:
+            self.stop()
+        except Exception:  # pylint: disable=broad-except
+            pass
+        try:
+            self._close_loop()
+        except Exception:  # pylint: disable=broad-except
+            pass
 
     @abc.abstractmethod
     def start(self, **kwargs: Any) -> None:

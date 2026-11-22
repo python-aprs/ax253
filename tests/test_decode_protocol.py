@@ -209,3 +209,116 @@ def test_sync_wrapper_protocol_setter_validates():
 def test_tnc2_decode_comment_and_blank_lines():
     frames = list(TNC2Decode().update(b"# comment\r\n\r\n   \r\nN0CALL>APRS:>x\r\n"))
     assert [f.info for f in frames] == [b">x"]
+
+
+def _serve_lines_once():
+    """Start a one-shot TNC2 peer in a thread that waits before sending."""
+    import socket
+    import threading
+    import time
+
+    listener = socket.create_server(("127.0.0.1", 0))
+
+    def serve():
+        conn, _ = listener.accept()
+        time.sleep(0.3)  # keep the first reader blocked while the second starts
+        conn.sendall(b"\r\n".join(LINES) + b"\r\n")
+        conn.close()
+        listener.close()
+
+    threading.Thread(target=serve, daemon=True).start()
+    return listener.getsockname()[1]
+
+
+def test_sync_wrapper_instances_in_threads():
+    """kiss3#12: each instance must own its loop so threads don't collide."""
+    import threading
+
+    results, errors = {}, []
+
+    def work(name):
+        try:
+            with SyncTNC2(_serve_lines_once()) as tnc:
+                results[name] = [f.info for f in tnc.read(min_frames=3)]
+        except Exception as exc:  # noqa: BLE001
+            errors.append(exc)
+
+    threads = [threading.Thread(target=work, args=(n,)) for n in "ab"]
+    for t in threads:
+        t.start()
+    for t in threads:
+        t.join(10)
+    assert errors == []
+    assert results == {n: [b">one", b">two", b">three"] for n in "ab"}
+
+
+def test_sync_wrapper_loop_per_instance_and_closed_on_del():
+    a, b = SyncTNC2(1), SyncTNC2(1)
+    loop_a = a.loop
+    assert loop_a is a.loop
+    assert loop_a is not b.loop
+    del a
+    import gc
+
+    gc.collect()
+    assert loop_a.is_closed()
+
+
+def test_sync_wrapper_uses_running_loop():
+    async def main():
+        tnc = SyncTNC2(1)
+        assert tnc.loop is asyncio.get_running_loop()
+        tnc._close_loop()  # not ours: must stay open
+        assert not asyncio.get_running_loop().is_closed()
+
+    asyncio.run(main())
+
+
+class _BrokenStop(SyncTNC2):
+    def stop(self):
+        raise OSError("stop failed")
+
+
+def test_sync_wrapper_del_never_raises(monkeypatch):
+    """aprs3#8: __del__ must not raise, even if stop() or __init__ failed."""
+    import gc
+    import sys
+
+    unraisable = []
+    monkeypatch.setattr(sys, "unraisablehook", unraisable.append)
+    broken = _BrokenStop(1)
+    _ = broken.loop
+    del broken
+    # __init__ never ran: attributes stop() and __del__ rely on are unset
+    half = SyncTNC2.__new__(SyncTNC2)
+    del half
+    gc.collect()
+    assert unraisable == []
+
+
+def test_sync_wrapper_connected_tracks_peer_close():
+    """kiss3#9: callers can tell when the connection has gone away."""
+    import socket
+    import threading
+
+    listener = socket.create_server(("127.0.0.1", 0))
+    go = threading.Event()
+
+    def serve():
+        conn, _ = listener.accept()
+        go.wait(5)
+        conn.sendall(LINES[0] + b"\r\n")
+        conn.close()
+        listener.close()
+
+    threading.Thread(target=serve, daemon=True).start()
+    tnc = SyncTNC2(listener.getsockname()[1])
+    assert not tnc.connected
+    tnc.start()
+    assert tnc.connected
+    go.set()
+    # read until EOF: returns once the peer closes, with the last frame
+    assert [f.info for f in tnc.read(min_frames=None)] == [b">one"]
+    assert not tnc.connected
+    tnc.stop()
+    assert not tnc.connected
