@@ -285,14 +285,25 @@ class AX25BytestreamDecoder(GenericDecoder[Frame]):
                 self._last_pframe = data[packet_start:]
                 break
             else:
-                fcs = data[end_flag_at - 2 : end_flag_at] or None
-                for frame in self.decode_frames(data[packet_start : end_flag_at - 2]):
-                    calc_fcs = FCS.from_bytes(bytes(frame)).digest()
-                    if calc_fcs != fcs:
-                        raise ValueError(
-                            f"FCS did not match for {frame}: {calc_fcs!r} != {fcs!r}"
+                payload = data[packet_start : end_flag_at - 2]
+                fcs = data[end_flag_at - 2 : end_flag_at]
+                # check the FCS over the bytes as received: re-encoding a
+                # decoded frame need not reproduce them (e.g. C bits)
+                calc_fcs = FCS.from_bytes(payload).digest()
+                if calc_fcs != fcs:
+                    _logger.debug(
+                        "Dropping frame with bad FCS: %r (calculated %r, got %r)",
+                        payload,
+                        calc_fcs,
+                        fcs,
+                    )
+                else:
+                    try:
+                        yield from self.decode_frames(payload)
+                    except ValueError:
+                        _logger.debug(
+                            "Dropping undecodable frame %r", payload, exc_info=True
                         )
-                    yield frame
                 packet_start = end_flag_at
 
     def flush(self) -> Iterable[Frame]:
