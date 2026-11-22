@@ -15,7 +15,7 @@ __license__ = "Apache License, Version 2.0"
 log = logging.getLogger(__name__)
 
 
-@dataclasses.dataclass
+@dataclasses.dataclass(slots=True)
 class TNC2Decode(GenericDecoder[Frame]):
     """
     Decode packets in CR-LF delimited TNC2 monitor format.
@@ -61,7 +61,7 @@ class TNC2Decode(GenericDecoder[Frame]):
         yield from self._decode_line(buffered)
 
 
-@dataclasses.dataclass
+@dataclasses.dataclass(slots=True)
 class TNC2Protocol(FrameDecodeProtocol[Frame]):
     """Protocol for decoding a stream of TNC2 format packets."""
 

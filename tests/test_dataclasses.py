@@ -85,3 +85,12 @@ def test_value_types_are_slotted():
     frame = Frame.from_str("N0CALL>APZ069,WIDE1-1:hello")
     for obj in (frame, frame.source, frame.path[0], frame.control):
         assert not hasattr(obj, "__dict__"), type(obj)
+
+
+def test_decoders_are_slotted():
+    from ax253.fcs import FCS
+    from ax253.frame import AX25BytestreamDecoder
+    from ax253.tnc2 import TNC2Decode
+
+    for obj in (TNC2Decode(), AX25BytestreamDecoder(), FCS()):
+        assert not hasattr(obj, "__dict__"), type(obj)

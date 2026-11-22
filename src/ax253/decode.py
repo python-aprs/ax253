@@ -26,7 +26,7 @@ EOF = object()
 _T = TypeVar("_T")
 
 
-@dataclasses.dataclass
+@dataclasses.dataclass(slots=True)
 class GenericDecoder(Generic[_T]):
     """Generic stateful decoder."""
 
@@ -56,7 +56,7 @@ class GenericDecoder(Generic[_T]):
         return
 
 
-@dataclasses.dataclass
+@dataclasses.dataclass(slots=True)
 class FrameDecodeProtocol(asyncio.Protocol, Generic[_T]):
     """Protocol which uses a GenericDecoder to split the stream into frames."""
 
@@ -148,7 +148,7 @@ class FrameDecodeProtocol(asyncio.Protocol, Generic[_T]):
         self.transport.write(bytes(frame))
 
 
-@dataclasses.dataclass
+@dataclasses.dataclass(slots=True)
 class SyncFrameDecode(abc.ABC, Generic[_T]):
     """
     Synchronous wrapper over FrameDecodeProtocol.

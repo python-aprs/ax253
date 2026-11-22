@@ -252,7 +252,7 @@ class Frame:
         )
 
 
-@dataclasses.dataclass
+@dataclasses.dataclass(slots=True)
 class AX25BytestreamDecoder(GenericDecoder[Frame]):
     """Decode a generic AX25_FLAG delimited bytestream"""
 

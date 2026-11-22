@@ -37,7 +37,7 @@ __copyright__ = "Copyright (c) 2013 Christopher H. Casebeer. All rights reserved
 __license__ = "BSD 2-clause Simplified License"
 
 
-@dataclasses.dataclass
+@dataclasses.dataclass(slots=True)
 class FCS:
     fcs: int = 0xFFFF
 
