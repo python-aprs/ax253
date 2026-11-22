@@ -54,8 +54,8 @@ class FrameType(enum.Enum):
         for val in cls.__members__.values():
             if control & val.value == val.value:
                 return val
-        raise ValueError(
-            "Cannot interpret control byte {!r} as a valid AX.25 frame type."
+        raise ValueError(  # pragma: no cover (FrameType.I matches everything)
+            f"Cannot interpret control byte {control!r} as a valid AX.25 frame type."
         )
 
 
@@ -101,7 +101,8 @@ class Control:
 
     @property
     def p_f(self) -> bool:
-        return bool(self.bv[4])
+        """The Poll/Final bit (0x10 in modulo-8 control fields)."""
+        return bool(self.v[0] & 0x10)
 
     def __bytes__(self) -> bytes:
         return self.v
