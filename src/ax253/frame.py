@@ -145,11 +145,25 @@ class Frame:
         path: Sequence[Address | str] | None = None,
         info: bytes = b"",
     ):
-        """Create a UI frame with the given information."""
+        """
+        Create a UI frame with the given information.
+
+        Path entries follow the TNC2 monitor convention: a ``*`` marks the
+        last digipeater that has repeated the frame, and every digipeater
+        before it is implicitly repeated too. Their H bits are all set.
+        """
+        path_addresses = [Address.from_any(p) for p in path or []]
+        last_repeated = max(
+            (ix for ix, p in enumerate(path_addresses) if p.digi), default=-1
+        )
+        last_ix = len(path_addresses) - 1
         return cls(
-            destination=Address.from_any(destination),
-            source=Address.from_any(source, a7_hldc=not bool(path)),
-            path=[Address.from_any(p, a7_hldc=(p == path[-1])) for p in path or []],
+            destination=Address.from_any(destination, digi=False, a7_hldc=False),
+            source=Address.from_any(source, digi=False, a7_hldc=not path_addresses),
+            path=[
+                p.evolve(digi=ix <= last_repeated, a7_hldc=ix == last_ix)
+                for ix, p in enumerate(path_addresses)
+            ],
             info=info,
         )
 
@@ -158,8 +172,10 @@ class Frame:
         """
         Decode the frame from AX.25 bytes.
         """
-        destination = Address.from_bytes(ax25_bytes[:7])
-        source = last_address = Address.from_bytes(ax25_bytes[7:14])
+        # bit 7 of the destination/source SSID byte is the C (command/response)
+        # bit, not a has-been-repeated flag. Dire Wolf sets it on both.
+        destination = Address.from_bytes(ax25_bytes[:7], digi=False)
+        source = last_address = Address.from_bytes(ax25_bytes[7:14], digi=False)
         path = []
         path_start = 14
         while not last_address.a7_hldc:
@@ -209,13 +225,19 @@ class Frame:
         )
 
     def __str__(self) -> str:
-        """Serialize the frame as TNC2 monitor format."""
+        """
+        Serialize the frame as TNC2 monitor format.
+
+        Only the last digipeater with its H bit set is marked with ``*``.
+        """
+        path = list(self.path or [])
+        last_repeated = max((ix for ix, p in enumerate(path) if p.digi), default=-1)
         full_path = [
-            str(self.destination),
-            *(str(p) for p in self.path or []),
+            str(self.destination.evolve(digi=False)),
+            *(str(p.evolve(digi=ix == last_repeated)) for ix, p in enumerate(path)),
         ]
         return "%s>%s:%s" % (
-            str(self.source),
+            str(self.source.evolve(digi=False)),
             ",".join(full_path),
             bytes(self.info).decode("latin1"),
         )

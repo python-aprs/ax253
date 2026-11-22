@@ -1,0 +1,48 @@
+# Monitor-format packets encoded by Dire Wolf's gen_packets and decoded back
+# with `atest -h` to record the exact AX.25 bytes Dire Wolf produces.
+# One packet per line; blank lines and lines starting with '#' are ignored.
+# Regenerate direwolf_frames.json with:  python tests/fixtures/direwolf/generate.py
+#
+# --- minimal / no path
+N0CALL>APRS:>status
+N0CALL>APRS:
+A>B:>one-letter callsigns
+123456>APRS:>all-digit callsign
+ABCDEF>GHIJKL:>six-character callsigns
+# --- SSIDs 1..15 on source, destination and digipeaters
+N0CALL-1>APRS:>ssid 1
+N0CALL-9>APRS:>ssid 9
+N0CALL-10>APRS:>ssid 10
+N0CALL-15>APRS:>ssid 15
+N0CALL>APRS-1:>dest ssid 1
+N0CALL>APRS-15:>dest ssid 15
+N0CALL-7>APDW17-3,WIDE1-1:>ssids everywhere
+# --- path lengths 1..8
+N0CALL>APRS,WIDE1-1:>1 digi
+N0CALL>APRS,WIDE1-1,WIDE2-1:>2 digis
+N0CALL>APRS,RELAY,WIDE,TRACE3-3:>3 digis
+N0CALL>APRS,A,B,C,D:>4 digis
+N0CALL>APRS,A,B,C,D,E,F,G,H:>8 digis
+# --- has-been-repeated (H) bits: '*' marks the last repeated digipeater
+N0CALL>APRS,W1ABC-1*:>only digi repeated
+N0CALL>APRS,W1ABC-1*,WIDE2-1:>first of two repeated
+N0CALL>APRS,W1ABC-1,WIDE2*:>both repeated, star on last
+N0CALL>APRS,K7ABC-3,W7DEF-2*,WIDE2-1:>two of three repeated
+N0CALL>APRS,A,B,C,D,E,F,G,H*:>all eight repeated
+N0CALL>APRS,WIDE1*,WIDE2-1:>new-n paradigm, WIDE1-1 used up
+# --- duplicate path entries
+N0CALL>APRS,WIDE1-1,WIDE1-1:>duplicate digis
+N0CALL>APRS,WIDE2-2,WIDE2-2,WIDE2-2:>three identical digis
+# --- common real-world destination (tocall) and path shapes
+KF7HVM-9>T7SVWP,WIDE1-1,WIDE2-1:`2(al"|>/]"4-}146.520MHz=
+W1AW>APDW17,WIDE2-1:!4237.14NS07120.83W#PHG7140 Dire Wolf digi
+N0CALL-10>APN391,WIDE2-2:!4605.21N/12327.31W#
+N0CALL-14>APRX29,TCPIP*:>aprx igate
+N0CALL>BEACON:>generic beacon tocall
+# --- info field contents
+N0CALL>APRS:>trailing space 
+N0CALL>APRS::KF7HVM   :hello world{42
+N0CALL>APRS:<0x1c><0x1d>mic-e style binary<0x7f><0xff>
+N0CALL>APRS:>colon:in:info and > gt and , comma
+N0CALL>APRS:}W1AW>APRS,TCPIP,N0CALL*:>third party
+N0CALL>APRS:>012345678901234567890123456789012345678901234567890123456789012345678901234567890123456789012345678901234567890123456789012345678901234567890123456789012345678901234567890123456789012345678901234567890123456789012345678901234567890123456789012345678901234
