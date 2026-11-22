@@ -1,11 +1,12 @@
 """asyncio Protocol for extracting individual frames from CRLF-delimited TNC2."""
+
 import logging
-from typing import Iterable
+from collections.abc import Iterable
 
 from attrs import define, field
 
-from .frame import Frame
 from .decode import FrameDecodeProtocol, GenericDecoder
+from .frame import Frame
 
 __author__ = "Masen Furer KF7HVM <kf7hvm@0x26.net>"
 __copyright__ = "Copyright 2022 Masen Furer and Contributors"

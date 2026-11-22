@@ -1,12 +1,12 @@
 """AX.25 address encode/decode"""
+
 import re
 from typing import Any, Union
 
 import attr.validators
-from attrs import define, field
 from attr import validators
+from attrs import define, field
 from bitarray import bitarray
-
 
 __author__ = "Masen Furer KF7HVM <kf7hvm@0x26.net>"
 __copyright__ = "Copyright 2022 Masen Furer and Contributors"
@@ -19,7 +19,7 @@ VALID_CALLSIGN_REX = re.compile(rb"^[A-Z0-9]+$")
 def valid_callsign(instance, attribute, value):
     validators.instance_of(bytes)(instance, attribute, value)
     if not VALID_CALLSIGN_REX.match(value):
-        raise ValueError("{!r} does not match {!r}".format(value, VALID_CALLSIGN_REX))
+        raise ValueError(f"{value!r} does not match {VALID_CALLSIGN_REX!r}")
 
 
 @define(slots=True, frozen=True)
@@ -39,9 +39,7 @@ class Address:
     def from_bytes(cls, ax25_address: bytes, **kwargs: Any) -> "Address":
         """Create an address from ax25 bytes."""
         if len(ax25_address) != 7:
-            raise ValueError(
-                "ax25 address must be 7 bytes, got {}".format(len(ax25_address))
-            )
+            raise ValueError(f"ax25 address must be 7 bytes, got {len(ax25_address)}")
         callsign = bytes(b >> 1 for b in ax25_address[:6]).rstrip()
         ssid = (ax25_address[6] >> 1) & 0x0F
         a7 = bitarray()
@@ -61,7 +59,10 @@ class Address:
 
     @classmethod
     def from_str(
-        cls, address_spec: str, a7_hldc: bool = False, **kwargs: Any,
+        cls,
+        address_spec: str,
+        a7_hldc: bool = False,
+        **kwargs: Any,
     ) -> "Address":
         """Create an address from a string (TNC2 format)."""
         digi = "*" in address_spec
@@ -82,7 +83,9 @@ class Address:
 
     @classmethod
     def from_any(
-        cls, address: Union["Address", bytes, str], **kwargs: Any,
+        cls,
+        address: Union["Address", bytes, str],
+        **kwargs: Any,
     ) -> "Address":
         """Create an address from any supported value."""
         if isinstance(address, cls):
@@ -108,9 +111,7 @@ class Address:
     def __bytes__(self) -> bytes:
         """Encode address as ax25 bytes."""
         if len(self.callsign) > 6:
-            raise ValueError(
-                "Cannot encode callsign > 6 bytes: {}".format(self.callsign)
-            )
+            raise ValueError(f"Cannot encode callsign > 6 bytes: {self.callsign}")
         callsign = bytes(b << 1 for b in self.callsign.ljust(6))
         a7 = bitarray()
         a7.frombytes(bytes([self.ssid << 1]))

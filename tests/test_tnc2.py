@@ -1,8 +1,8 @@
 """Test decode CRLF delimited UI packets"""
 
-from ax253 import Address, Frame, TNC2Decode
-
 import pytest
+
+from ax253 import Address, Frame, TNC2Decode
 
 idiotv = dict(
     frames=b"""

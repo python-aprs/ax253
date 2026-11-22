@@ -1,4 +1,5 @@
 """Python ax253 Utility Functions."""
+
 __author__ = "Masen Furer KF7HVM <kf7hvm@0x26.net>"
 __copyright__ = "Copyright 2022 Masen Furer and Contributors"
 __license__ = "Apache License, Version 2.0"
@@ -11,15 +12,11 @@ def valid_length(at_least, at_most=None, sequence_validator=None):
         len_value = len(value)
         if len_value < at_least:
             raise ValueError(
-                "{} must be at least {} (actual={})".format(
-                    attribute.name, at_least, len_value
-                )
+                f"{attribute.name} must be at least {at_least} (actual={len_value})"
             )
         if at_most is not None and len_value > at_most:
             raise ValueError(
-                "{} must be at most {} (actual={})".format(
-                    attribute.name, at_most, len_value
-                )
+                f"{attribute.name} must be at most {at_most} (actual={len_value})"
             )
 
     return _validator

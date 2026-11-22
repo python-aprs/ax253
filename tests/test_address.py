@@ -2,11 +2,8 @@ import pytest
 
 from ax253 import Address
 
-
 __author__ = "Masen Furer KF7HVM <kf7hvm@0x26.net>"  # NOQA pylint: disable=R0801
-__copyright__ = (
-    "Copyright 2022 Masen Furer and Contributors"  # NOQA pylint: disable=R0801
-)
+__copyright__ = "Copyright 2022 Masen Furer and Contributors"  # NOQA pylint: disable=R0801
 __license__ = "Apache License, Version 2.0"  # NOQA pylint: disable=R0801
 
 

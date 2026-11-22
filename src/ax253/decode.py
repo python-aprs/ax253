@@ -1,19 +1,15 @@
 """Generic deframing decoder."""
+
 import abc
 import asyncio
+from collections.abc import AsyncIterable, Callable, Iterable, Sequence
 from types import TracebackType
 from typing import (
     Any,
-    AsyncIterable,
-    Callable,
-    cast,
     Generic,
-    Iterable,
-    Optional,
-    Sequence,
     SupportsBytes,
-    Type,
     TypeVar,
+    cast,
 )
 
 from attrs import define, field
@@ -64,7 +60,7 @@ class GenericDecoder(Generic[_T]):
 class FrameDecodeProtocol(asyncio.Protocol, Generic[_T]):
     """Protocol which uses a GenericDecoder to split the stream into frames."""
 
-    transport: Optional[asyncio.Transport] = field(default=None)
+    transport: asyncio.Transport | None = field(default=None)
     decoder: GenericDecoder[_T] = field(factory=GenericDecoder)
     frames: asyncio.Queue = field(factory=asyncio.Queue, init=False)
     connection_future: asyncio.Future = field(
@@ -104,8 +100,8 @@ class FrameDecodeProtocol(asyncio.Protocol, Generic[_T]):
 
     async def read(
         self,
-        n_frames: Optional[int] = None,
-        callback: Optional[Callable[[_T], None]] = None,
+        n_frames: int | None = None,
+        callback: Callable[[_T], None] | None = None,
     ) -> AsyncIterable[_T]:
         """
         Iterate through decoded frames.
@@ -126,9 +122,9 @@ class FrameDecodeProtocol(asyncio.Protocol, Generic[_T]):
 
     def read_frames(
         self,
-        n_frames: Optional[int] = -1,
-        callback: Optional[Callable[[_T], None]] = None,
-        loop: Optional[asyncio.BaseEventLoop] = None,
+        n_frames: int | None = -1,
+        callback: Callable[[_T], None] | None = None,
+        loop: asyncio.BaseEventLoop | None = None,
     ) -> Sequence[_T]:
         """Blocking read of the given number of frames."""
         if loop is None:
@@ -163,7 +159,7 @@ class SyncFrameDecode(abc.ABC, Generic[_T]):
     _loop = None
     """The asyncio event loop that this class and subclasses will use."""
 
-    _protocol: Optional[FrameDecodeProtocol[_T]] = field(default=None)
+    _protocol: FrameDecodeProtocol[_T] | None = field(default=None)
     """The connected protocol (access via .protocol property)."""
 
     @property
@@ -180,7 +176,7 @@ class SyncFrameDecode(abc.ABC, Generic[_T]):
     @property
     def protocol(self) -> FrameDecodeProtocol[_T]:
         if self._protocol is None:
-            raise IOError(
+            raise OSError(
                 "Underlying connection is not active. Hint: did you call start()?",
             )
         return self._protocol
@@ -189,9 +185,7 @@ class SyncFrameDecode(abc.ABC, Generic[_T]):
     def protocol(self, p) -> None:
         if not isinstance(p, FrameDecodeProtocol):
             raise ValueError(
-                "Protocol must be a subclass of {!r}, got {!r}".format(
-                    FrameDecodeProtocol, p
-                ),
+                f"Protocol must be a subclass of {FrameDecodeProtocol!r}, got {p!r}",
             )
         self._protocol = p
 
@@ -201,10 +195,10 @@ class SyncFrameDecode(abc.ABC, Generic[_T]):
 
     def __exit__(
         self,
-        exc_type: Optional[Type[BaseException]],
-        exc: Optional[BaseException],
-        traceback: Optional[TracebackType],
-    ) -> Optional[bool]:
+        exc_type: type[BaseException] | None,
+        exc: BaseException | None,
+        traceback: TracebackType | None,
+    ) -> bool | None:
         return self.stop()
 
     def __del__(self) -> None:
@@ -226,8 +220,8 @@ class SyncFrameDecode(abc.ABC, Generic[_T]):
 
     def read(
         self,
-        callback: Optional[Callable[[_T], None]] = None,
-        min_frames: Optional[int] = -1,
+        callback: Callable[[_T], None] | None = None,
+        min_frames: int | None = -1,
     ) -> Sequence[_T]:
         """
         Read frames from underlying protocol.
