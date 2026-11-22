@@ -1,0 +1,42 @@
+# Representative APRS-IS lines, one per line, in the exact text form APRS-IS
+# servers (aprsc, javAPRSSrvr) send to clients. Hand-assembled from formats
+# observed on the network; a live capture will supplement these.
+# Blank lines and lines starting with '#' are ignored.
+#
+# RF-gated by an igate (qAR), digipeated via new-n paradigm
+N0CALL-9>T7SVWP,WIDE1*,WIDE2-1,qAR,W7DG-5:`2(al"|>/]"4-}146.520MHz=
+# RF-gated, digipeater callsign substituted (traced) and used up
+W1AW-10>APN391,K1ABC-1*,WIDE2,qAR,K1XYZ-10:!4142.06N/07243.53W#PHG5360/W2, CTn
+# APRSdroid over TCP (qAC with T2 server name longer than 6 characters)
+KF7HVM-7>APDR16,TCPIP*,qAC,T2SWEDEN:=4608.50N/12253.75W$/A=000079 https://aprsdroid.org/
+# server-verified login on a port that sees the station directly (qAS)
+DB0ABC-10>APMI06,TCPIP*,qAS,DB0ABC:@221133z5008.24N/00837.11E#PHG2360 digi
+# igate's own beacon (qAC), no RF path
+N0CALL-10>APRX29,TCPIP*,qAC,FOURTH:!4605.21NR12327.31W&aprx igate
+# unverified client (qAX) and an over-length (7-9 char) source
+BALLOON12>APRS,TCPIP*,qAX,T2USANW:>tracking test flight
+# D-STAR D-PRS gateway: alphanumeric SSID on source and gateway
+KJ4ABC-B>APDPRS,DSTAR*,qAR,KJ4ABC-G:!3536.30N/07839.98W[/ D-PRS test
+# Citizen Weather Observer Program (6-char numeric-suffix callsign, qAO)
+FW1234>APRS,TCPIP*,qAO,AMBCWOP-1:@221135z4504.12N/09310.40W_090/005g010t045r000p000P000h85b10132L000.WD 31
+# Winlink object gateway with 8-character tactical source
+WINLINK>APWL2K,TCPIP*,qAC,T2FINLND:;KJ4ABC-10*221135z3536.30NW07839.98Wa144.950MHz
+# message, ack and reply-ack forms
+KF7HVM>APRS,TCPIP*,qAC,T2TEXAS::N0CALL-9 :hello world{42
+N0CALL-9>APDR16,WIDE1-1,qAR,W7DG-5::KF7HVM   :ack42
+KF7HVM>APRS,TCPIP*,qAC,T2TEXAS::N0CALL-9 :reply ack form{AB}CD
+# third-party traffic carried inside the info field
+N0CALL-14>APRS,TCPIP*,qAC,T2CAN:}W1AW>APRS,TCPIP,N0CALL-14*:>third-party status
+# telemetry definition and data
+N0CALL-11>APRS,WIDE2-1,qAR,N0CALL-10::N0CALL-11:PARM.Volts,Temp,Lux
+N0CALL-11>APRS,WIDE2-1,qAR,N0CALL-10:T#005,199,000,255,073,123,01101001
+# info field with ':' and '>' and trailing spaces
+N0CALL>APRS,TCPIP*,qAC,T2TEXAS:>status: a > b, c:d  
+# 8-hop RF path (maximum AX.25 digipeaters) then the q-construct
+N0CALL>APRS,A1,B2,C3,D4,E5,F6,G7*,H8,qAR,N0CALL-10:>long path
+# qAo: packet gated from RF by an igate that was not the addressee
+N0CALL-1>APRS,WIDE2-2,qAo,N0CALL-10:>qAo: igate gated a packet heard but not addressed
+# Mic-E with binary-looking bytes in info (latin1 decoded)
+N0CALL-9>SV2RYS,WIDE1-1,qAR,W7DG-5:`(_fn"Oj/]"4V}=
+# position with timestamp, compressed format
+N0CALL-5>APRS,TCPIP*,qAC,T2TEXAS:@092345z/5L!!<*e7>7P[ compressed

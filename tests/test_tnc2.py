@@ -22,7 +22,7 @@ IDIOTV>APN391,HEBOWX,qAR,NPLNS:!4539.11NF12324.96W#PHG27651/KB7WUK OR Idiotville
             path=[
                 Address(callsign=b"HEBOWX", ssid=0, digi=False, a7_hldc=False),
                 Address(callsign=b"N7QXO", ssid=9, digi=False, a7_hldc=False),
-                Address(callsign=b"QAR", ssid=0, digi=False, a7_hldc=False),
+                Address(callsign=b"qAR", ssid=0, digi=False, a7_hldc=False),
                 Address(callsign=b"KG7ZZA", ssid=10, digi=False, a7_hldc=True),
             ],
             control=b"\x03",
@@ -35,7 +35,7 @@ IDIOTV>APN391,HEBOWX,qAR,NPLNS:!4539.11NF12324.96W#PHG27651/KB7WUK OR Idiotville
             path=[
                 Address(callsign=b"HEBOWX", ssid=0, digi=False, a7_hldc=False),
                 Address(callsign=b"N7QXO", ssid=9, digi=False, a7_hldc=False),
-                Address(callsign=b"QAR", ssid=0, digi=False, a7_hldc=False),
+                Address(callsign=b"qAR", ssid=0, digi=False, a7_hldc=False),
                 Address(callsign=b"KG7ZZA", ssid=10, digi=False, a7_hldc=True),
             ],
             control=b"\x03",
@@ -47,7 +47,7 @@ IDIOTV>APN391,HEBOWX,qAR,NPLNS:!4539.11NF12324.96W#PHG27651/KB7WUK OR Idiotville
             source=Address(callsign=b"IDIOTV", ssid=0, digi=False, a7_hldc=False),
             path=[
                 Address(callsign=b"HEBOWX", ssid=0, digi=False, a7_hldc=False),
-                Address(callsign=b"QAR", ssid=0, digi=False, a7_hldc=False),
+                Address(callsign=b"qAR", ssid=0, digi=False, a7_hldc=False),
                 Address(callsign=b"KG7ZZA", ssid=10, digi=False, a7_hldc=True),
             ],
             control=b"\x03",
@@ -60,7 +60,7 @@ IDIOTV>APN391,HEBOWX,qAR,NPLNS:!4539.11NF12324.96W#PHG27651/KB7WUK OR Idiotville
             path=[
                 Address(callsign=b"HEBOWX", ssid=0, digi=False, a7_hldc=False),
                 Address(callsign=b"N7QXO", ssid=9, digi=False, a7_hldc=False),
-                Address(callsign=b"QAR", ssid=0, digi=False, a7_hldc=False),
+                Address(callsign=b"qAR", ssid=0, digi=False, a7_hldc=False),
                 Address(callsign=b"KG7ZZA", ssid=10, digi=False, a7_hldc=True),
             ],
             control=b"\x03",
@@ -73,7 +73,7 @@ IDIOTV>APN391,HEBOWX,qAR,NPLNS:!4539.11NF12324.96W#PHG27651/KB7WUK OR Idiotville
             path=[
                 Address(callsign=b"HEBOWX", ssid=0, digi=False, a7_hldc=False),
                 Address(callsign=b"N7QXO", ssid=9, digi=False, a7_hldc=False),
-                Address(callsign=b"QAR", ssid=0, digi=False, a7_hldc=False),
+                Address(callsign=b"qAR", ssid=0, digi=False, a7_hldc=False),
                 Address(callsign=b"KG7ZZA", ssid=10, digi=False, a7_hldc=True),
             ],
             control=b"\x03",
@@ -86,7 +86,7 @@ IDIOTV>APN391,HEBOWX,qAR,NPLNS:!4539.11NF12324.96W#PHG27651/KB7WUK OR Idiotville
             path=[
                 Address(callsign=b"HEBOWX", ssid=0, digi=False, a7_hldc=False),
                 Address(callsign=b"N7QXO", ssid=9, digi=False, a7_hldc=False),
-                Address(callsign=b"QAR", ssid=0, digi=False, a7_hldc=False),
+                Address(callsign=b"qAR", ssid=0, digi=False, a7_hldc=False),
                 Address(callsign=b"NPLNS", ssid=0, digi=False, a7_hldc=True),
             ],
             control=b"\x03",
@@ -99,7 +99,7 @@ IDIOTV>APN391,HEBOWX,qAR,NPLNS:!4539.11NF12324.96W#PHG27651/KB7WUK OR Idiotville
             path=[
                 Address(callsign=b"HEBOWX", ssid=0, digi=False, a7_hldc=False),
                 Address(callsign=b"N7QXO", ssid=9, digi=False, a7_hldc=False),
-                Address(callsign=b"QAR", ssid=0, digi=False, a7_hldc=False),
+                Address(callsign=b"qAR", ssid=0, digi=False, a7_hldc=False),
                 Address(callsign=b"SHERWD", ssid=0, digi=False, a7_hldc=True),
             ],
             control=b"\x03",
@@ -111,7 +111,7 @@ IDIOTV>APN391,HEBOWX,qAR,NPLNS:!4539.11NF12324.96W#PHG27651/KB7WUK OR Idiotville
             source=Address(callsign=b"IDIOTV", ssid=0, digi=False, a7_hldc=False),
             path=[
                 Address(callsign=b"HEBOWX", ssid=0, digi=False, a7_hldc=False),
-                Address(callsign=b"QAR", ssid=0, digi=False, a7_hldc=False),
+                Address(callsign=b"qAR", ssid=0, digi=False, a7_hldc=False),
                 Address(callsign=b"NPLNS", ssid=0, digi=False, a7_hldc=True),
             ],
             control=b"\x03",
