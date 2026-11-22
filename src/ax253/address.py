@@ -50,7 +50,11 @@ class Address:
         init_kwargs = dict(
             callsign=callsign,
             ssid=ssid,
-            digi=c_or_h if hldc else False,
+            # For digipeater addresses bit 7 is the H ("has been repeated")
+            # bit, set on *every* digipeater that has relayed the frame, not
+            # only the last address. For destination/source it is the C
+            # (command/response) bit instead; Frame.from_bytes overrides it.
+            digi=c_or_h,
             a7_hldc=hldc,
         )
         if kwargs:
@@ -75,7 +79,7 @@ class Address:
             callsign=callsign,
             ssid=ssid,
             digi=digi,
-            a7_hldc=digi or a7_hldc,
+            a7_hldc=a7_hldc,
         )
         if kwargs:
             init_kwargs.update(**kwargs)
@@ -115,7 +119,7 @@ class Address:
         callsign = bytes(b << 1 for b in self.callsign.ljust(6))
         a7 = bitarray()
         a7.frombytes(bytes([self.ssid << 1]))
-        a7[0] = self.digi and self.a7_hldc
+        a7[0] = self.digi
         a7[1:3] = True  # r
         a7[7] = self.a7_hldc
         return callsign + a7.tobytes()
