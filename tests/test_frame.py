@@ -2,7 +2,6 @@ import pytest
 
 from ax253 import Address, AX25BytestreamDecoder, Control, Frame
 
-
 __author__ = "Masen Furer KF7HVM <kf7hvm@0x26.net>"
 __copyright__ = "Copyright 2022 Masen Furer and Contributors"
 __license__ = "Apache License, Version 2.0"
@@ -14,9 +13,7 @@ __license__ = "Apache License, Version 2.0"
         (
             "FOO>APRS:!4605.21N/12327.31W#RNG0125Foo comment",
             Frame(
-                destination=Address(
-                    callsign=b"APRS", ssid=0, digi=False, a7_hldc=False
-                ),
+                destination=Address(callsign=b"APRS", ssid=0, digi=False, a7_hldc=False),
                 source=Address(callsign=b"FOO", ssid=0, digi=False, a7_hldc=True),
                 path=[],
                 control=Control(b"\x03"),

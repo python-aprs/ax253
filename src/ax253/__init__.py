@@ -1,9 +1,9 @@
 from importlib.metadata import version
 
 from .address import Address
-from .decode import GenericDecoder, FrameDecodeProtocol, SyncFrameDecode
+from .decode import FrameDecodeProtocol, GenericDecoder, SyncFrameDecode
 from .frame import AX25BytestreamDecoder, Control, Frame, FrameType
-from .tnc2 import TNC2Protocol, TNC2Decode
+from .tnc2 import TNC2Decode, TNC2Protocol
 
 __author__ = "Masen Furer KF7HVM <kf7hvm@0x26.net>"
 __copyright__ = "Copyright 2022 Masen Furer and Contributors"

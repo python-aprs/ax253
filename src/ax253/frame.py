@@ -1,17 +1,18 @@
 """AX.25 frame encode/decode"""
+
 import enum
 import logging
-from typing import Any, Iterable, Optional, Sequence, Union
+from collections.abc import Iterable, Sequence
+from typing import Any
 
-from attrs import define, field
 from attr import converters, validators
+from attrs import define, field
 from bitarray import bitarray
 
 from . import util
 from .address import Address
 from .decode import GenericDecoder
 from .fcs import FCS
-
 
 __author__ = "Masen Furer KF7HVM <kf7hvm@0x26.net>"
 __copyright__ = "Copyright 2022 Masen Furer and Contributors"
@@ -23,7 +24,7 @@ AX25_FLAG = 0x7E
 AX25_FLAG_B = bytes([AX25_FLAG])
 
 # AX.25 Protocol ID — This field is set to 0xf0 (no layer 3 protocol).
-NO_PROTOCOL_ID = b"\xF0"
+NO_PROTOCOL_ID = b"\xf0"
 # AX.25 Control Field — This field is set to 0x03 (UI-frame).
 UI_CONTROL_FIELD = b"\x03"
 
@@ -67,6 +68,7 @@ def bytes_from_int(b_or_i) -> bytes:
 @define(frozen=True, slots=True)
 class Control:
     """The Frame control byte, indicates FrameType and PID"""
+
     v: bytes = field(
         validator=util.valid_length(1, 1, validators.instance_of(bytes)),
         converter=bytes_from_int,
@@ -123,8 +125,10 @@ class Frame:
     destination: Address
     source: Address
     path: Sequence[Address]
-    control: Control = field(default=Control(UI_CONTROL_FIELD), converter=Control.from_any)
-    pid: Optional[bytes] = field(
+    control: Control = field(
+        default=Control(UI_CONTROL_FIELD), converter=Control.from_any
+    )
+    pid: bytes | None = field(
         default=NO_PROTOCOL_ID,
         validator=validators.optional(
             util.valid_length(1, 1, validators.instance_of(bytes)),
@@ -136,9 +140,9 @@ class Frame:
     @classmethod
     def ui(
         cls,
-        destination: Union[Address, str],
-        source: Union[Address, str],
-        path: Optional[Sequence[Union[Address, str]]] = None,
+        destination: Address | str,
+        source: Address | str,
+        path: Sequence[Address | str] | None = None,
         info: bytes = b"",
     ):
         """Create a UI frame with the given information."""
@@ -246,11 +250,8 @@ class AX25BytestreamDecoder(GenericDecoder[Frame]):
         while 0 < (packet_start + 1) < len(data) or len(data) == 1:
             if data[packet_start] != AX25_FLAG:
                 _logger.debug(
-                    "AX.25 frame did not start with flag {}, got {} "
-                    "instead (treating it as the start)".format(
-                        bin(AX25_FLAG),
-                        bin(data[packet_start]),
-                    )
+                    f"AX.25 frame did not start with flag {bin(AX25_FLAG)}, got {bin(data[packet_start])} "
+                    "instead (treating it as the start)"
                 )
             while (packet_start + 1) < len(data) and data[packet_start] == AX25_FLAG:
                 # consume flag bytes until data is reached
@@ -267,9 +268,7 @@ class AX25BytestreamDecoder(GenericDecoder[Frame]):
                     calc_fcs = FCS.from_bytes(bytes(frame)).digest()
                     if calc_fcs != fcs:
                         raise ValueError(
-                            "FCS did not match for {}: {!r} != {!r}".format(
-                                frame, calc_fcs, fcs
-                            )
+                            f"FCS did not match for {frame}: {calc_fcs!r} != {fcs!r}"
                         )
                     yield frame
                 packet_start = end_flag_at
