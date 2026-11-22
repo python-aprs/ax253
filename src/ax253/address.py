@@ -13,7 +13,13 @@ __copyright__ = "Copyright 2022 Masen Furer and Contributors"
 __license__ = "Apache License, Version 2.0"
 
 
-VALID_CALLSIGN_REX = re.compile(rb"^[A-Z0-9]+$")
+# APRS-IS (TNC2 text) is more permissive than AX.25: q-constructs are
+# lowercase (qAR, qAC), and callsigns may be up to 9 characters with an
+# alphanumeric SSID (e.g. D-STAR "KJ4ABC-B"). Accept those in text, and only
+# enforce AX.25 rules when encoding to bytes.
+VALID_CALLSIGN_REX = re.compile(rb"^[A-Za-z0-9]+(-[A-Za-z0-9]{1,2})?$")
+AX25_CALLSIGN_REX = re.compile(rb"^[A-Z0-9]{1,6}$")
+AX25_SSIDS = frozenset(str(n) for n in range(16))
 
 
 def valid_callsign(instance, attribute, value):
@@ -22,13 +28,23 @@ def valid_callsign(instance, attribute, value):
         raise ValueError(f"{value!r} does not match {VALID_CALLSIGN_REX!r}")
 
 
+def valid_ssid(instance, attribute, value):
+    if not 0 <= value <= 15:
+        raise ValueError(f"ssid must be 0-15, got {value!r}")
+
+
 @define(slots=True, frozen=True)
 class Address:
     """A source, destination, or path entry in an AX.25 frame."""
 
-    callsign: bytes = field(converter=lambda c: c.upper(), validator=valid_callsign)
-    """The callsign associated with the address."""
-    ssid: int = field(default=0, converter=int)
+    callsign: bytes = field(validator=valid_callsign)
+    """
+    The callsign associated with the address, case preserved.
+
+    For APRS-IS addresses whose SSID is not a number 0-15 (e.g. "KJ4ABC-B"),
+    the whole text is kept here and ``ssid`` is 0.
+    """
+    ssid: int = field(default=0, converter=int, validator=valid_ssid)
     """The ssid (0-15) extension of the callsign."""
     digi: bool = field(default=False, converter=bool)
     """If true, indicates that this address has digipeated the packet."""
@@ -50,7 +66,11 @@ class Address:
         init_kwargs = dict(
             callsign=callsign,
             ssid=ssid,
-            digi=c_or_h if hldc else False,
+            # For digipeater addresses bit 7 is the H ("has been repeated")
+            # bit, set on *every* digipeater that has relayed the frame, not
+            # only the last address. For destination/source it is the C
+            # (command/response) bit instead; Frame.from_bytes overrides it.
+            digi=c_or_h,
             a7_hldc=hldc,
         )
         if kwargs:
@@ -68,14 +88,19 @@ class Address:
         digi = "*" in address_spec
         address = address_spec.strip("*")
         callsign_str, found, ssid_str = address.partition("-")
-        callsign = callsign_str.encode("utf-8")
-
-        ssid = int(ssid_str) if ssid_str else 0
+        if ssid_str in AX25_SSIDS:
+            callsign, ssid = callsign_str.encode("latin1"), int(ssid_str)
+        elif not found:
+            callsign, ssid = callsign_str.encode("latin1"), 0
+        else:
+            # not representable in AX.25 (e.g. "KJ4ABC-B", "N0CALL-16",
+            # "N0CALL-01"): keep the text verbatim
+            callsign, ssid = address.encode("latin1"), 0
         init_kwargs = dict(
             callsign=callsign,
             ssid=ssid,
             digi=digi,
-            a7_hldc=digi or a7_hldc,
+            a7_hldc=a7_hldc,
         )
         if kwargs:
             init_kwargs.update(**kwargs)
@@ -110,12 +135,16 @@ class Address:
 
     def __bytes__(self) -> bytes:
         """Encode address as ax25 bytes."""
-        if len(self.callsign) > 6:
-            raise ValueError(f"Cannot encode callsign > 6 bytes: {self.callsign}")
-        callsign = bytes(b << 1 for b in self.callsign.ljust(6))
+        callsign = self.callsign.upper()
+        if not AX25_CALLSIGN_REX.match(callsign):
+            raise ValueError(
+                f"Cannot encode {self.callsign!r} as an AX.25 address: callsign must be 1-6 "
+                "letters or digits"
+            )
+        callsign = bytes(b << 1 for b in callsign.ljust(6))
         a7 = bitarray()
         a7.frombytes(bytes([self.ssid << 1]))
-        a7[0] = self.digi and self.a7_hldc
+        a7[0] = self.digi
         a7[1:3] = True  # r
         a7[7] = self.a7_hldc
         return callsign + a7.tobytes()

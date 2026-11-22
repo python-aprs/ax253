@@ -22,7 +22,13 @@ class TNC2Decode(GenericDecoder[Frame]):
     Decode packets in CR-LF delimited TNC2 monitor format.
 
     Example: SENDER>DEST,PATH:data for the packet
+
+    Lines may be split across any number of ``update()`` calls (TCP delivers
+    a byte stream, not lines); an incomplete trailing line is buffered until
+    its terminator arrives, or until ``flush()``.
     """
+
+    _buffer: bytes = field(default=b"", init=False, repr=False)
 
     @staticmethod
     def decode_frames(frame: bytes) -> Iterable[Frame]:
@@ -31,14 +37,29 @@ class TNC2Decode(GenericDecoder[Frame]):
         except Exception:
             log.debug("Ignore frame decode error %r", frame, exc_info=True)
 
+    def _decode_line(self, packet: bytes) -> Iterable[Frame]:
+        if packet.strip().startswith(b"#"):
+            log.debug(packet)  # log comment
+            return
+        if packet:
+            yield from self.decode_frames(packet)
+
     def update(self, new_data: bytes) -> Iterable[Frame]:
-        packets = new_data.splitlines()
-        for packet in packets:
-            if packet.strip().startswith(b"#"):
-                log.debug(packet)  # log comment
-                continue
-            if packet:
-                yield from self.decode_frames(packet)
+        data = self._buffer + new_data
+        lines = data.splitlines(keepends=True)
+        self._buffer = b""
+        if lines and not lines[-1].endswith((b"\n", b"\r")):
+            self._buffer = lines.pop()
+        elif data.endswith(b"\r"):
+            # CR may be the first half of a CRLF split across reads; the
+            # LF will arrive as an empty line and be ignored
+            pass
+        for line in lines:
+            yield from self._decode_line(line.rstrip(b"\r\n"))
+
+    def flush(self) -> Iterable[Frame]:
+        buffered, self._buffer = self._buffer, b""
+        yield from self._decode_line(buffered)
 
 
 @define

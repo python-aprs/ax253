@@ -11,9 +11,10 @@ __license__ = "Apache License, Version 2.0"  # NOQA pylint: disable=R0801
     "text,exp_address",
     (
         ("N0CALL", Address(b"N0CALL", 0, False, False)),
-        ("N0CALL*", Address(b"N0CALL", 0, True, True)),
+        # '*' sets the H bit only; it says nothing about the end of the path
+        ("N0CALL*", Address(b"N0CALL", 0, True, False)),
         ("N0CALL-1", Address(b"N0CALL", 1, False, False)),
-        ("N0CALL-1*", Address(b"N0CALL", 1, True, True)),
+        ("N0CALL-1*", Address(b"N0CALL", 1, True, False)),
     ),
 )
 def test_address_from_text(text, exp_address):
@@ -30,9 +31,16 @@ def test_address_from_text(text, exp_address):
         (b"\x9c`\x86\x82\x98\x98\xe1", Address(b"N0CALL", 0, True, True)),
         (b"\x9c`\x86\x82\x98\x98b", Address(b"N0CALL", 1, False, False)),
         (b"\x9c`\x86\x82\x98\x98\xe3", Address(b"N0CALL", 1, True, True)),
+        # H bit set on an address that is not the last one (repeated digi
+        # followed by more path entries)
+        (b"\x9c`\x86\x82\x98\x98\xe0", Address(b"N0CALL", 0, True, False)),
+        (b"\x9c`\x86\x82\x98\x98\xe2", Address(b"N0CALL", 1, True, False)),
+        # last address, not repeated
+        (b"\x9c`\x86\x82\x98\x98a", Address(b"N0CALL", 0, False, True)),
     ),
 )
 def test_address_from_ax25(ax25_bytes, exp_address):
     a = Address.from_bytes(ax25_bytes)
     assert a == exp_address
-    assert Address.from_str(str(a)) == exp_address
+    assert bytes(a) == ax25_bytes
+    assert Address.from_str(str(a), a7_hldc=a.a7_hldc) == exp_address
