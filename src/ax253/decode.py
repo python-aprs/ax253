@@ -2,6 +2,7 @@
 
 import abc
 import asyncio
+import logging
 from collections.abc import AsyncIterable, Callable, Iterable, Sequence
 from types import TracebackType
 from typing import (
@@ -19,8 +20,13 @@ __copyright__ = "Copyright 2022 Masen Furer and Contributors"
 __license__ = "Apache License, Version 2.0"
 
 
+log = logging.getLogger(__name__)
+
 # indicates that no more frames will appear on this protocol
 EOF = object()
+
+# default bound on decoded frames waiting to be read
+DEFAULT_MAX_QUEUED_FRAMES = 10000
 
 # Used throughout this module to represent the type of the decoded frame
 _T = TypeVar("_T")
@@ -67,9 +73,36 @@ class FrameDecodeProtocol(asyncio.Protocol, Generic[_T]):
         factory=asyncio.Future,
         init=False,
     )
+    max_queued_frames: int | None = field(
+        default=DEFAULT_MAX_QUEUED_FRAMES,
+        kw_only=True,
+    )
+    """
+    Most decoded frames kept waiting to be read. When full, the oldest frame
+    is dropped to make room (and counted in `dropped_frames`). None means
+    no limit.
+    """
+    dropped_frames: int = field(default=0, init=False)
+    """Number of frames dropped because nobody read them in time."""
 
     def _queue_frame(self, frame: _T) -> None:
         self.frame_decoded(frame)
+        limit = self.max_queued_frames
+        if limit is not None:
+            while self.frames.qsize() >= max(limit, 1):
+                try:
+                    self.frames.get_nowait()
+                except asyncio.QueueEmpty:  # pragma: no cover
+                    break
+                self.dropped_frames += 1
+                if self.dropped_frames == 1 or self.dropped_frames % 1000 == 0:
+                    log.warning(
+                        "Receive queue full (%d frames): dropped %d oldest "
+                        "frame(s) so far. Read frames more often or raise "
+                        "max_queued_frames.",
+                        limit,
+                        self.dropped_frames,
+                    )
         self.frames.put_nowait(frame)
 
     def connection_made(self, transport: asyncio.Transport) -> None:
@@ -281,10 +314,6 @@ class SyncFrameDecode(abc.ABC, Generic[_T]):
             if None, read until EOF is seen (device closed)
         :return: List of frames
         """
-        if self.protocol is None:
-            raise EOFError(
-                "Underlying connection is not active. Hint: did you call start()?",
-            )
         return list(
             self.protocol.read_frames(
                 n_frames=min_frames,

@@ -82,3 +82,34 @@ def test_frame_pid_only_for_i_and_ui(control, has_pid):
     assert frame.pid == (b"\xf0" if has_pid else None)
     assert frame.info == b"xy"
     assert bytes(frame) == raw
+
+
+# --- issue #17: classify every control byte per the AX.25 2.2 spec ---
+
+_U_FRAMES = {
+    0x03: "U_UI",
+    0x0F: "U_DM",
+    0x2F: "U_SABM",
+    0x43: "U_DISC",
+    0x63: "U_UA",
+    0x6F: "U_SABME",
+    0x87: "U_FRMR",
+    0xAF: "U_XID",
+    0xE3: "U_TEST",
+}
+_S_FRAMES = {0x01: "S_RR", 0x05: "S_RNR", 0x09: "S_REJ", 0x0D: "S_SREJ"}
+
+
+@pytest.mark.parametrize("control", range(256))
+def test_FrameType_from_control_byte_all(control):
+    if control & 0x01 == 0:
+        assert FrameType.from_control_byte(control) is FrameType.I
+    elif control & 0x03 == 0x01:
+        exp = _S_FRAMES[control & 0x0F]
+        assert FrameType.from_control_byte(control).name == exp
+    elif (control & ~0x10) in _U_FRAMES:
+        exp = _U_FRAMES[control & ~0x10]
+        assert FrameType.from_control_byte(control).name == exp
+    else:
+        with pytest.raises(ValueError):
+            FrameType.from_control_byte(control)

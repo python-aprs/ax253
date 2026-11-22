@@ -27,6 +27,8 @@ AX25_FLAG_B = bytes([AX25_FLAG])
 NO_PROTOCOL_ID = b"\xf0"
 # AX.25 Control Field — This field is set to 0x03 (UI-frame).
 UI_CONTROL_FIELD = b"\x03"
+# AX.25 2.2: at most 8 digipeater addresses in the address field
+MAX_DIGIPEATERS = 8
 
 
 class FrameType(enum.Enum):
@@ -50,13 +52,23 @@ class FrameType(enum.Enum):
     I = 0x0  # noqa: E741
 
     @classmethod
-    def from_control_byte(cls, control: int):
-        for val in cls.__members__.values():
-            if control & val.value == val.value:
-                return val
-        raise ValueError(  # pragma: no cover (FrameType.I matches everything)
-            f"Cannot interpret control byte {control!r} as a valid AX.25 frame type."
-        )
+    def from_control_byte(cls, control: int) -> "FrameType":
+        """
+        Classify a (modulo-8) control byte, ignoring the P/F, N(S) and N(R) bits.
+
+        :raises ValueError: for a U-frame control byte that isn't a defined
+            AX.25 command or response.
+        """
+        if control & 0x01 == 0:
+            return cls.I
+        if control & 0x03 == 0x01:
+            return cls(control & 0x0F)  # RR, RNR, REJ, SREJ
+        try:
+            return cls(control & ~0x10 & 0xFF)  # U frame without the P/F bit
+        except ValueError:
+            raise ValueError(
+                f"Cannot interpret control byte {control:#04x} as a valid AX.25 frame type."
+            ) from None
 
 
 def bytes_from_int(b_or_i) -> bytes:
@@ -108,6 +120,13 @@ class Control:
         return self.v
 
 
+def _encode_info_text(text: str) -> bytes:
+    try:
+        return text.encode("latin1")
+    except UnicodeEncodeError:
+        return text.encode("utf-8")
+
+
 def bytes_or_encode_utf8(v):
     if isinstance(v, (bytes, bytearray)):
         return bytes(v)
@@ -137,6 +156,17 @@ class Frame:
         converter=converters.optional(bytes_from_int),
     )
     info: bytes = field(default=b"", converter=bytes_or_encode_utf8)
+    command_response: tuple[bool, bool] = field(
+        default=(False, False),
+        converter=lambda v: (bool(v[0]), bool(v[1])),
+        kw_only=True,
+    )
+    """
+    The AX.25 v2 command/response (C) bits of the destination and source
+    addresses, kept so a decoded frame re-encodes to the same bytes.
+    ``(True, False)`` is a command, ``(False, True)`` a response; both equal
+    means a v1 frame. Not shown in TNC2 text.
+    """
 
     @classmethod
     def ui(
@@ -180,6 +210,10 @@ class Frame:
         path = []
         path_start = 14
         while not last_address.a7_hldc:
+            if len(path) == MAX_DIGIPEATERS:
+                raise ValueError(
+                    f"AX.25 allows at most {MAX_DIGIPEATERS} digipeater addresses"
+                )
             last_address = Address.from_bytes(ax25_bytes[path_start : path_start + 7])
             path.append(last_address)
             path_start += 7
@@ -197,13 +231,20 @@ class Frame:
             control=control,
             pid=pid,
             info=ax25_bytes[info_start:],
+            command_response=(bool(ax25_bytes[6] & 0x80), bool(ax25_bytes[13] & 0x80)),
         )
 
     def __bytes__(self) -> bytes:
         """Encode the frame as AX.25."""
+        if len(self.path) > MAX_DIGIPEATERS:
+            raise ValueError(
+                f"Cannot encode {len(self.path)} digipeaters as AX.25 (at most "
+                f"{MAX_DIGIPEATERS}); TNC2 text has no such limit"
+            )
+        dest_c, src_c = self.command_response
         encoded_frame = [
-            bytes(self.destination),
-            bytes(self.source),
+            bytes(self.destination.evolve(digi=dest_c or self.destination.digi)),
+            bytes(self.source.evolve(digi=src_c or self.source.digi)),
             *(bytes(p) for p in self.path),
             bytes(self.control),
         ]
@@ -214,7 +255,14 @@ class Frame:
 
     @classmethod
     def from_str(cls, ax25_text: str) -> "Frame":
-        """Decode the frame from TNC2 monitor format."""
+        """
+        Decode the frame from TNC2 monitor format.
+
+        TNC2 text from the stream decoders holds the info bytes decoded as
+        Latin-1, so they are encoded back the same way. Text that can't be
+        Latin-1 (typed by a user, e.g. "€") is encoded as UTF-8, the usual
+        encoding on APRS-IS.
+        """
         source_text, gt, rem = ax25_text.partition(">")
         address_field, colon, info_text = rem.partition(":")
         destination_text, *paths_text = address_field.split(",")
@@ -222,7 +270,7 @@ class Frame:
             destination=destination_text,
             source=source_text,
             path=paths_text,
-            info=info_text.encode("latin1"),
+            info=_encode_info_text(info_text),
         )
 
     def __str__(self) -> str:
@@ -244,9 +292,24 @@ class Frame:
         )
 
 
+# Shortest frame: destination + source (14) + control (1) + FCS (2)
+MIN_FRAME_WITH_FCS = 17
+# How far past a failed frame to look for a later flag that completes it
+# (AX.25 2.2 maximum is ~330 bytes; leave headroom for long info fields)
+MAX_FRAME_WITH_FCS = 1024
+
+
 @define
 class AX25BytestreamDecoder(GenericDecoder[Frame]):
-    """Decode a generic AX25_FLAG delimited bytestream"""
+    """
+    Decode a byte stream of AX25_FLAG (0x7E) delimited frames, each followed
+    by its 2-byte FCS.
+
+    The stream carries no escaping, so 0x7E may also occur inside a frame
+    (e.g. "~" in the info field, or in the FCS). When the bytes up to a flag
+    fail the FCS check, later flags are tried as the end of the same frame
+    before the bytes are dropped as corrupt.
+    """
 
     _last_pframe: bytes = field(default=b"", init=False)
 
@@ -261,6 +324,29 @@ class AX25BytestreamDecoder(GenericDecoder[Frame]):
         if frame:
             yield Frame.from_bytes(frame)
 
+    @staticmethod
+    def _check(segment: bytes) -> bytes | None:
+        """The frame bytes of ``segment`` (frame + FCS) if its FCS matches."""
+        if len(segment) < MIN_FRAME_WITH_FCS:
+            return None
+        payload, fcs = segment[:-2], segment[-2:]
+        # check the FCS over the bytes as received
+        if FCS.from_bytes(payload).digest() != fcs:
+            return None
+        return payload
+
+    def _decode_payload(self, payload: bytes) -> Iterable[Frame]:
+        try:
+            yield from self.decode_frames(payload)
+        except ValueError:
+            _logger.debug("Dropping undecodable frame %r", payload, exc_info=True)
+
+    @staticmethod
+    def _skip_flags(data: bytes, ix: int) -> int:
+        while ix < len(data) and data[ix] == AX25_FLAG:
+            ix += 1
+        return ix
+
     def update(self, new_data: bytes) -> Iterable[Frame]:
         """
         Decode the next sequence of bytes from the stream.
@@ -268,47 +354,56 @@ class AX25BytestreamDecoder(GenericDecoder[Frame]):
         :param new_data: the next bytes from the stream
         :return: an iterable of decoded frames
         """
-        packet_start = 0
         data, self._last_pframe = self._last_pframe + new_data, b""
-        while 0 < (packet_start + 1) < len(data) or len(data) == 1:
-            if data[packet_start] != AX25_FLAG:
-                _logger.debug(
-                    f"AX.25 frame did not start with flag {bin(AX25_FLAG)}, got {bin(data[packet_start])} "
-                    "instead (treating it as the start)"
-                )
-            while (packet_start + 1) < len(data) and data[packet_start] == AX25_FLAG:
-                # consume flag bytes until data is reached
-                packet_start += 1
-            # find the end of the packet
-            end_flag_at = data.find(AX25_FLAG, packet_start)
-            if end_flag_at < 0:
-                # didn't find the end, so add to the buffer and continue
-                self._last_pframe = data[packet_start:]
-                break
-            else:
-                payload = data[packet_start : end_flag_at - 2]
-                fcs = data[end_flag_at - 2 : end_flag_at]
-                # check the FCS over the bytes as received: re-encoding a
-                # decoded frame need not reproduce them (e.g. C bits)
-                calc_fcs = FCS.from_bytes(payload).digest()
-                if calc_fcs != fcs:
-                    _logger.debug(
-                        "Dropping frame with bad FCS: %r (calculated %r, got %r)",
-                        payload,
-                        calc_fcs,
-                        fcs,
-                    )
-                else:
-                    try:
-                        yield from self.decode_frames(payload)
-                    except ValueError:
-                        _logger.debug(
-                            "Dropping undecodable frame %r", payload, exc_info=True
-                        )
-                packet_start = end_flag_at
+        start = self._skip_flags(data, 0)
+        while start < len(data):
+            end = data.find(AX25_FLAG, start)
+            if end < 0:
+                break  # frame not finished yet
+            payload = self._check(data[start:end])
+            if payload is not None:
+                yield from self._decode_payload(payload)
+                start = self._skip_flags(data, end)
+                continue
+            # Not a valid frame up to this flag. Either the flag byte belongs
+            # to the frame, or the frame is corrupt.
+            next_start = self._skip_flags(data, end)
+            next_end = data.find(AX25_FLAG, next_start)
+            later_end = end
+            resolved = False
+            while True:
+                later_end = data.find(AX25_FLAG, later_end + 1)
+                if later_end < 0 or later_end - start > MAX_FRAME_WITH_FCS:
+                    break
+                payload = self._check(data[start:later_end])
+                if payload is not None:
+                    yield from self._decode_payload(payload)
+                    start = self._skip_flags(data, later_end)
+                    resolved = True
+                    break
+                if later_end == next_end and self._check(data[next_start:next_end]):
+                    break  # the next frame is whole: this one was corrupt
+            if resolved:
+                continue
+            if (
+                later_end < 0
+                and len(data) - start <= MAX_FRAME_WITH_FCS
+                and (next_end < 0 or not self._check(data[next_start:next_end]))
+            ):
+                break  # a later flag may still complete this frame
+            _logger.debug("Dropping frame with bad FCS: %r", data[start:end])
+            start = next_start
+        self._last_pframe = data[start:]
 
     def flush(self) -> Iterable[Frame]:
-        """Call when the stream is closing to decode any final buffered bytes."""
-        if self._last_pframe:
-            yield from self.decode_frames(self._last_pframe)
-        return
+        """
+        Call when the stream is closing to decode any final buffered bytes.
+
+        Buffered bytes are decoded only if they end in a valid FCS.
+        """
+        buffered, self._last_pframe = self._last_pframe, b""
+        payload = self._check(buffered)
+        if payload is not None:
+            yield from self._decode_payload(payload)
+        elif buffered:
+            _logger.debug("Dropping unterminated frame %r", buffered)
