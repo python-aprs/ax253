@@ -45,10 +45,10 @@ def address_fields(raw: bytes):
 
 def mask_command_bits(raw: bytes) -> bytes:
     """Clear the C bits of destination and source (bit 7 of each SSID byte)."""
-    raw = bytearray(raw)
-    raw[6] &= 0x7F
-    raw[13] &= 0x7F
-    return bytes(raw)
+    masked = bytearray(raw)
+    masked[6] &= 0x7F
+    masked[13] &= 0x7F
+    return bytes(masked)
 
 
 def test_corpus_is_nonempty():

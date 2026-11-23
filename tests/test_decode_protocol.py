@@ -98,6 +98,15 @@ def test_protocol_write_tnc2_text():
     assert asyncio.run(main()) == b"N0CALL>APRS,WIDE1-1:>hi\r\n"
 
 
+def test_write_before_connection_raises():
+    async def main():
+        for protocol in (FrameDecodeProtocol(), TNC2Protocol()):
+            with pytest.raises(ConnectionError):
+                protocol.write(Frame.from_str("N0CALL>APRS:>hi"))
+
+    asyncio.run(main())
+
+
 def test_generic_protocol_write_bytes():
     async def main():
         async with tnc2_peer() as (port, received, done):
@@ -131,7 +140,7 @@ class SyncTNC2(SyncFrameDecode[Frame]):
         self.loop.run_until_complete(self.protocol.connection_future)
 
     def stop(self):
-        if self._protocol is not None:
+        if self._protocol is not None and self._protocol.transport is not None:
             self._protocol.transport.close()
             self._protocol = None
 

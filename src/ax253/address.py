@@ -1,7 +1,7 @@
 """AX.25 address encode/decode"""
 
 import re
-from typing import Any, Union
+from typing import Any, Self, Union
 
 import attr.validators
 from attr import validators
@@ -52,7 +52,7 @@ class Address:
     a7_hldc: bool = field(default=False, converter=bool, repr=False)
 
     @classmethod
-    def from_bytes(cls, ax25_address: bytes, **kwargs: Any) -> "Address":
+    def from_bytes(cls, ax25_address: bytes, **kwargs: Any) -> Self:
         """Create an address from ax25 bytes."""
         if len(ax25_address) != 7:
             raise ValueError(f"ax25 address must be 7 bytes, got {len(ax25_address)}")
@@ -63,7 +63,7 @@ class Address:
         c_or_h = a7[0]
         r = a7[1:3]  # noqa: F841
         hldc = a7[7]
-        init_kwargs = dict(
+        init_kwargs: dict[str, Any] = dict(
             callsign=callsign,
             ssid=ssid,
             # For digipeater addresses bit 7 is the H ("has been repeated")
@@ -83,7 +83,7 @@ class Address:
         address_spec: str,
         a7_hldc: bool = False,
         **kwargs: Any,
-    ) -> "Address":
+    ) -> Self:
         """Create an address from a string (TNC2 format)."""
         digi = "*" in address_spec
         address = address_spec.strip("*")
@@ -96,7 +96,7 @@ class Address:
             # not representable in AX.25 (e.g. "KJ4ABC-B", "N0CALL-16",
             # "N0CALL-01"): keep the text verbatim
             callsign, ssid = address.encode("latin1"), 0
-        init_kwargs = dict(
+        init_kwargs: dict[str, Any] = dict(
             callsign=callsign,
             ssid=ssid,
             digi=digi,
