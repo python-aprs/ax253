@@ -3,7 +3,7 @@
 import enum
 import logging
 from collections.abc import Iterable, Sequence
-from typing import Any
+from typing import Any, Self, SupportsBytes
 
 from attr import converters, validators
 from attrs import define, field
@@ -174,8 +174,8 @@ class Frame:
         destination: Address | str,
         source: Address | str,
         path: Sequence[Address | str] | None = None,
-        info: bytes = b"",
-    ):
+        info: bytes | SupportsBytes | str = b"",
+    ) -> Self:
         """
         Create a UI frame with the given information.
 
@@ -199,7 +199,7 @@ class Frame:
         )
 
     @classmethod
-    def from_bytes(cls, ax25_bytes: bytes) -> "Frame":
+    def from_bytes(cls, ax25_bytes: bytes) -> Self:
         """
         Decode the frame from AX.25 bytes.
         """
@@ -248,13 +248,13 @@ class Frame:
             *(bytes(p) for p in self.path),
             bytes(self.control),
         ]
-        if self.control.ftype in (FrameType.I, FrameType.U_UI):
+        if self.control.ftype in (FrameType.I, FrameType.U_UI) and self.pid is not None:
             encoded_frame.append(self.pid)
         encoded_frame.append(bytes(self.info))
         return b"".join(encoded_frame)
 
     @classmethod
-    def from_str(cls, ax25_text: str) -> "Frame":
+    def from_str(cls, ax25_text: str) -> Self:
         """
         Decode the frame from TNC2 monitor format.
 

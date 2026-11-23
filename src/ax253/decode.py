@@ -105,7 +105,7 @@ class FrameDecodeProtocol(asyncio.Protocol, Generic[_T]):
                     )
         self.frames.put_nowait(frame)
 
-    def connection_made(self, transport: asyncio.Transport) -> None:
+    def connection_made(self, transport: asyncio.BaseTransport) -> None:
         """
         asyncio callback when connection is established.
 
@@ -113,8 +113,9 @@ class FrameDecodeProtocol(asyncio.Protocol, Generic[_T]):
         require the transport, an awaitable `connection_future` is completed for consumers
         who depend on an active connection.
         """
-        self.transport = transport
-        self.connection_future.set_result(transport)
+        # the stream transports this protocol is used with are full Transports
+        self.transport = cast(asyncio.Transport, transport)
+        self.connection_future.set_result(self.transport)
 
     def frame_decoded(self, frame: _T) -> None:
         """Subclasses may override this function to handle new frame."""
@@ -125,7 +126,7 @@ class FrameDecodeProtocol(asyncio.Protocol, Generic[_T]):
         for frame in self.decoder.update(data):
             self._queue_frame(frame)
 
-    def connection_lost(self, exc: Exception) -> None:
+    def connection_lost(self, exc: Exception | None) -> None:
         """asyncio callback when connection is lost."""
         for frame in self.decoder.flush():
             self._queue_frame(frame)
@@ -157,7 +158,7 @@ class FrameDecodeProtocol(asyncio.Protocol, Generic[_T]):
         self,
         n_frames: int | None = -1,
         callback: Callable[[_T], None] | None = None,
-        loop: asyncio.BaseEventLoop | None = None,
+        loop: asyncio.AbstractEventLoop | None = None,
     ) -> Sequence[_T]:
         """Blocking read of the given number of frames."""
         if loop is None:
@@ -177,7 +178,12 @@ class FrameDecodeProtocol(asyncio.Protocol, Generic[_T]):
 
         :param frame: Frame to write.
         """
-        self.transport.write(bytes(frame))
+        self._connected_transport().write(bytes(frame))
+
+    def _connected_transport(self) -> asyncio.Transport:
+        if self.transport is None:
+            raise ConnectionError("not connected: the transport isn't open yet")
+        return self.transport
 
 
 @define

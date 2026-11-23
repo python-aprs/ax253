@@ -2,6 +2,7 @@
 
 import logging
 from collections.abc import Iterable
+from typing import SupportsBytes
 
 from attrs import define, field
 
@@ -66,8 +67,8 @@ class TNC2Decode(GenericDecoder[Frame]):
 class TNC2Protocol(FrameDecodeProtocol[Frame]):
     """Protocol for decoding a stream of TNC2 format packets."""
 
-    decoder: TNC2Decode = field(factory=TNC2Decode)
+    decoder: GenericDecoder[Frame] = field(factory=TNC2Decode)
 
-    def write(self, frame: Frame) -> None:
-        """Write the Frame to the transport."""
-        return self.transport.write(str(frame).encode("latin1") + b"\r\n")
+    def write(self, frame: SupportsBytes) -> None:
+        """Write the frame to the transport as a TNC2 line."""
+        self._connected_transport().write(str(frame).encode("latin1") + b"\r\n")
