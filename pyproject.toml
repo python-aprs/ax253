@@ -64,9 +64,10 @@ ignore = [
 extend-safe-fixes = ["UP028"]
 
 [tool.pytest.ini_options]
-testpaths = ["tests"]
+testpaths = ["tests", "src", "README.md"]
 timeout = 30
-addopts = "--cov=ax253 --cov-report=term-missing"
+addopts = "--cov=ax253 --cov-report=term-missing --doctest-modules --doctest-glob=README.md"
+doctest_optionflags = ["NORMALIZE_WHITESPACE"]
 
 [tool.coverage.report]
 fail_under = 95
