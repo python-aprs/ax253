@@ -120,6 +120,13 @@ class Control:
         return self.v
 
 
+def _with_flags(address: Address, digi: bool, a7_hldc: bool) -> Address:
+    """``address`` with these H and end-of-address bits (unchanged if equal)."""
+    if address.digi == digi and address.a7_hldc == a7_hldc:
+        return address
+    return address.evolve(digi=digi, a7_hldc=a7_hldc)
+
+
 def _encode_info_text(text: str) -> bytes:
     try:
         return text.encode("latin1")
@@ -192,7 +199,7 @@ class Frame:
             destination=Address.from_any(destination, digi=False, a7_hldc=False),
             source=Address.from_any(source, digi=False, a7_hldc=not path_addresses),
             path=[
-                p.evolve(digi=ix <= last_repeated, a7_hldc=ix == last_ix)
+                _with_flags(p, digi=ix <= last_repeated, a7_hldc=ix == last_ix)
                 for ix, p in enumerate(path_addresses)
             ],
             info=info,
@@ -243,8 +250,8 @@ class Frame:
             )
         dest_c, src_c = self.command_response
         encoded_frame = [
-            bytes(self.destination.evolve(digi=dest_c or self.destination.digi)),
-            bytes(self.source.evolve(digi=src_c or self.source.digi)),
+            self.destination._to_bytes(dest_c or self.destination.digi),
+            self.source._to_bytes(src_c or self.source.digi),
             *(bytes(p) for p in self.path),
             bytes(self.control),
         ]
@@ -279,14 +286,14 @@ class Frame:
 
         Only the last digipeater with its H bit set is marked with ``*``.
         """
-        path = list(self.path or [])
+        path = self.path or ()
         last_repeated = max((ix for ix, p in enumerate(path) if p.digi), default=-1)
         full_path = [
-            str(self.destination.evolve(digi=False)),
-            *(str(p.evolve(digi=ix == last_repeated)) for ix, p in enumerate(path)),
+            self.destination._to_str(False),
+            *(p._to_str(ix == last_repeated) for ix, p in enumerate(path)),
         ]
         return "%s>%s:%s" % (
-            str(self.source.evolve(digi=False)),
+            self.source._to_str(False),
             ",".join(full_path),
             bytes(self.info).decode("latin1"),
         )

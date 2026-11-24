@@ -44,3 +44,14 @@ def test_address_from_ax25(ax25_bytes, exp_address):
     assert a == exp_address
     assert bytes(a) == ax25_bytes
     assert Address.from_str(str(a), a7_hldc=a.a7_hldc) == exp_address
+
+
+@pytest.mark.parametrize("ssid_octet", range(256))
+def test_ssid_octet_bits(ssid_octet):
+    """C/H is bit 7, the SSID bits 1-4, end-of-address bit 0; bits 5-6 are reserved."""
+    a = Address.from_bytes(b"\x9c`\x86\x82\x98\x98" + bytes([ssid_octet]))
+    assert a.digi == bool(ssid_octet & 0x80)
+    assert a.ssid == (ssid_octet >> 1) & 0x0F
+    assert a.a7_hldc == bool(ssid_octet & 0x01)
+    # the reserved bits are always sent as 1
+    assert bytes(a)[6] == ssid_octet | 0x60
