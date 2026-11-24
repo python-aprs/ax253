@@ -249,3 +249,24 @@ def test_Frame_too_many_digipeaters():
     raw[70:70] = last
     with pytest.raises(ValueError, match="at most 8"):
         Frame.from_bytes(bytes(raw))
+
+
+# --- ax253#31: evolve and display text ---
+
+
+def test_frame_evolve_path():
+    frame = Frame.from_str("N0CALL>APRS,WIDE1-1*:>hi")
+    gated = frame.evolve(path=[*frame.path, "qAR", "N0CALL-10"])
+    assert str(gated) == "N0CALL>APRS,WIDE1-1*,qAR,N0CALL-10:>hi"
+    assert str(frame) == "N0CALL>APRS,WIDE1-1*:>hi"  # unchanged
+
+
+def test_info_text_utf8_and_latin1():
+    utf8 = Frame.from_str("A>B::N0CALL   :café €")
+    assert utf8.info_text == ":N0CALL   :café €"
+    assert utf8.to_text() == "A>B::N0CALL   :café €"
+    # str() stays the wire form, re-encoding to the same bytes
+    assert Frame.from_str(str(utf8)).info == utf8.info
+    latin1 = Frame.ui("B", "A", info=b">caf\xe9")
+    assert latin1.info_text == ">café"
+    assert latin1.to_text() == str(latin1) == "A>B:>café"

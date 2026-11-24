@@ -118,8 +118,25 @@ class Address:
                 address = address.evolve(**kwargs)
             return address
         elif isinstance(address, bytes):
-            return cls.from_bytes(address, **kwargs)
+            if len(address) == 7 and not VALID_CALLSIGN_REX.match(address):
+                return cls.from_bytes(address, **kwargs)
+            # anything else is callsign text, like ``Address.callsign``
+            return cls.from_str(address.decode("latin1"), **kwargs)
         return cls.from_str(str(address), **kwargs)
+
+    @property
+    def call(self) -> str:
+        """
+        The station as text, with its SSID: ``"KF7HVM-9"``.
+
+        Unlike ``str()``, never has the ``*`` that marks a repeated digipeater.
+        """
+        return str(self.evolve(digi=False))
+
+    @property
+    def base(self) -> str:
+        """The callsign without its SSID: ``"KF7HVM"`` for ``KF7HVM-9``."""
+        return self.call.partition("-")[0]
 
     def __str__(self) -> str:
         """Encode address as TNC2 string."""
