@@ -46,6 +46,36 @@ def test_address_from_ax25(ax25_bytes, exp_address):
     assert Address.from_str(str(a), a7_hldc=a.a7_hldc) == exp_address
 
 
+# --- ax253#30: text accessors, callsign bytes in from_any ---
+
+
+@pytest.mark.parametrize(
+    ("text", "call", "base"),
+    [
+        ("KF7HVM-9", "KF7HVM-9", "KF7HVM"),
+        ("WIDE1-1*", "WIDE1-1", "WIDE1"),
+        ("N0CALL", "N0CALL", "N0CALL"),
+        ("KJ4ABC-B", "KJ4ABC-B", "KJ4ABC"),
+        ("qAR", "qAR", "qAR"),
+    ],
+)
+def test_call_and_base(text, call, base):
+    address = Address.from_str(text)
+    assert address.call == call
+    assert address.base == base
+
+
+def test_from_any_callsign_bytes():
+    assert Address.from_any(b"N0CALL") == Address.from_str("N0CALL")
+    assert Address.from_any(b"N0CALL-7") == Address.from_str("N0CALL-7")
+    assert Address.from_any(b"N0CALL1") == Address.from_str("N0CALL1")  # 7 bytes of text
+
+
+def test_from_any_ax25_bytes_still_decode():
+    encoded = bytes(Address.from_str("N0CALL-7"))
+    assert Address.from_any(encoded).call == "N0CALL-7"
+
+
 @pytest.mark.parametrize("ssid_octet", range(256))
 def test_ssid_octet_bits(ssid_octet):
     """C/H is bit 7, the SSID bits 1-4, end-of-address bit 0; bits 5-6 are reserved."""

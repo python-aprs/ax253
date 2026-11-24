@@ -47,6 +47,13 @@ Addresses
 (b'N0CALL', 7)
 >>> str(address)
 'N0CALL-7'
+>>> frame.source.call, frame.source.base
+('N0CALL-7', 'N0CALL')
+
+``Frame.evolve`` copies a frame with changes, such as an igate's path:
+
+>>> print(frame.evolve(path=[*frame.path, "qAR", "N0CALL-10"]))
+N0CALL-7>APRS,WIDE1-1*,WIDE2-1,qAR,N0CALL-10:>On the air
 
 Streams
 =======

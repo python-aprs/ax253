@@ -7,7 +7,7 @@ from collections.abc import Iterable, Sequence
 from typing import Any, Self, SupportsBytes
 
 from attr import converters, validators
-from attrs import define, field
+from attrs import define, evolve, field
 from bitarray import bitarray
 
 from . import util
@@ -286,6 +286,19 @@ class Frame:
             path=paths_text,
             info=_encode_info_text(info_text),
         )
+
+    def evolve(self, **changes: Any) -> Self:
+        """
+        A copy of this frame with ``changes`` applied, e.g. a new ``path``.
+
+        Addresses may be given as text: ``frame.evolve(path=[*frame.path, "qAR", "N0CALL"])``.
+        """
+        for name in ("destination", "source"):
+            if name in changes:
+                changes[name] = Address.from_any(changes[name])
+        if "path" in changes:
+            changes["path"] = [Address.from_any(p) for p in changes["path"]]
+        return evolve(self, **changes)
 
     def __str__(self) -> str:
         """

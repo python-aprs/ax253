@@ -251,6 +251,16 @@ def test_Frame_too_many_digipeaters():
         Frame.from_bytes(bytes(raw))
 
 
+# --- ax253#31: evolve and display text ---
+
+
+def test_frame_evolve_path():
+    frame = Frame.from_str("N0CALL>APRS,WIDE1-1*:>hi")
+    gated = frame.evolve(path=[*frame.path, "qAR", "N0CALL-10"])
+    assert str(gated) == "N0CALL>APRS,WIDE1-1*,qAR,N0CALL-10:>hi"
+    assert str(frame) == "N0CALL>APRS,WIDE1-1*:>hi"  # unchanged
+
+
 # --- issue #27: a stream with no flags can't grow the buffer forever ---
 
 

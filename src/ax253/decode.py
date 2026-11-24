@@ -3,11 +3,19 @@
 import abc
 import asyncio
 import logging
-from collections.abc import AsyncIterable, Callable, Iterable, Sequence
+from collections.abc import (
+    AsyncIterable,
+    AsyncIterator,
+    Callable,
+    Iterable,
+    Iterator,
+    Sequence,
+)
 from types import TracebackType
 from typing import (
     Any,
     Generic,
+    Self,
     SupportsBytes,
     TypeVar,
     cast,
@@ -154,6 +162,10 @@ class FrameDecodeProtocol(asyncio.Protocol, Generic[_T]):
             yield frame
             n_frames -= 1
 
+    def __aiter__(self) -> AsyncIterator[_T]:
+        """``async for frame in protocol`` reads frames until the connection closes."""
+        return aiter(self.read())
+
     def read_frames(
         self,
         n_frames: int | None = -1,
@@ -266,7 +278,7 @@ class SyncFrameDecode(abc.ABC, Generic[_T]):
             )
         self._protocol = p
 
-    def __enter__(self) -> "SyncFrameDecode":
+    def __enter__(self) -> Self:
         self.start()
         return self
 
@@ -327,6 +339,18 @@ class SyncFrameDecode(abc.ABC, Generic[_T]):
                 loop=self.loop,
             )
         )
+
+    def __iter__(self) -> Iterator[_T]:
+        """
+        Block for each frame in turn, until the connection closes.
+
+        ``for frame in tnc:`` is ``read(min_frames=1)`` in a loop.
+        """
+        while True:
+            frames = self.read(min_frames=1)
+            if not frames:
+                return
+            yield from frames
 
     def write(self, frame: SupportsBytes) -> None:
         """
