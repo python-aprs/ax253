@@ -144,7 +144,8 @@ class Frame:
 
     destination: Address
     source: Address
-    path: Sequence[Address]
+    path: Sequence[Address] = field(converter=tuple)
+    """Digipeater addresses, kept as a tuple so frames are hashable."""
     control: Control = field(
         default=Control(UI_CONTROL_FIELD), converter=Control.from_any
     )
