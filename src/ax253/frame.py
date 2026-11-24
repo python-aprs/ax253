@@ -286,36 +286,12 @@ class Frame:
             changes["path"] = [Address.from_any(p) for p in changes["path"]]
         return evolve(self, **changes)
 
-    @property
-    def info_text(self) -> str:
-        """
-        The info field as text, for display: UTF-8, or Latin-1 if it isn't.
-
-        ``str(frame)`` decodes the info field as Latin-1 so the TNC2 line
-        re-encodes to the same bytes; that shows UTF-8 text such as "café"
-        as "cafÃ©". Use this (or ``to_text()``) to show a frame to a person.
-        """
-        info = bytes(self.info)
-        try:
-            return info.decode("utf-8")
-        except UnicodeDecodeError:
-            return info.decode("latin1")
-
-    def to_text(self) -> str:
-        """The frame in TNC2 monitor format, with the info field as ``info_text``."""
-        return self._tnc2(self.info_text)
-
     def __str__(self) -> str:
         """
         Serialize the frame as TNC2 monitor format.
 
         Only the last digipeater with its H bit set is marked with ``*``.
-        The info field is decoded as Latin-1, so the line encodes back to the
-        same bytes; see ``to_text()`` for display.
         """
-        return self._tnc2(bytes(self.info).decode("latin1"))
-
-    def _tnc2(self, info: str) -> str:
         path = list(self.path or [])
         last_repeated = max((ix for ix, p in enumerate(path) if p.digi), default=-1)
         full_path = [
@@ -325,7 +301,7 @@ class Frame:
         return "%s>%s:%s" % (
             str(self.source.evolve(digi=False)),
             ",".join(full_path),
-            info,
+            bytes(self.info).decode("latin1"),
         )
 
 

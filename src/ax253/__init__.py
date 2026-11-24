@@ -55,14 +55,6 @@ Addresses
 >>> print(frame.evolve(path=[*frame.path, "qAR", "N0CALL-10"]))
 N0CALL-7>APRS,WIDE1-1*,WIDE2-1,qAR,N0CALL-10:>On the air
 
-``str(frame)`` is the wire form, with the info field decoded as Latin-1 so it
-encodes back to the same bytes. Show frames to people with ``to_text()``,
-which decodes UTF-8:
-
->>> utf8 = Frame.from_str("N0CALL>APRS:>café ☕")
->>> str(utf8), utf8.to_text()
-('N0CALL>APRS:>cafÃ© â\x98\x95', 'N0CALL>APRS:>café ☕')
-
 Streams
 =======
 
