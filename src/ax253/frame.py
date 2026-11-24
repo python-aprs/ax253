@@ -2,6 +2,7 @@
 
 import enum
 import logging
+import re
 from collections.abc import Iterable, Sequence
 from typing import Any, Self, SupportsBytes
 
@@ -125,6 +126,11 @@ def _encode_info_text(text: str) -> bytes:
         return text.encode("latin1")
     except UnicodeEncodeError:
         return text.encode("utf-8")
+
+
+def _first_line(info: bytes) -> bytes:
+    """``info`` up to its first CR or LF."""
+    return re.split(rb"[\r\n]", info, maxsplit=1)[0]
 
 
 def bytes_or_encode_utf8(v):
@@ -278,6 +284,10 @@ class Frame:
         Serialize the frame as TNC2 monitor format.
 
         Only the last digipeater with its H bit set is marked with ``*``.
+
+        The info field ends at its first CR or LF, as APRS-IS igates cut it,
+        so the text is always one line: a CR or LF heard on RF can't start a
+        second, forged packet when the text is sent on to APRS-IS.
         """
         path = list(self.path or [])
         last_repeated = max((ix for ix, p in enumerate(path) if p.digi), default=-1)
@@ -288,7 +298,7 @@ class Frame:
         return "%s>%s:%s" % (
             str(self.source.evolve(digi=False)),
             ",".join(full_path),
-            bytes(self.info).decode("latin1"),
+            _first_line(bytes(self.info)).decode("latin1"),
         )
 
 
