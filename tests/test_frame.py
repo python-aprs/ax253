@@ -220,9 +220,25 @@ def test_Frame_from_str_non_latin1():
     assert Frame.from_bytes(bytes(f)) == f
 
 
-def test_Frame_from_str_latin1_preferred():
-    f = Frame.from_str("N0CALL>APRS:>caf\xe9")
+def test_Frame_from_str_is_utf8():
+    f = Frame.from_str("N0CALL>APRS:>café ☕")
+    assert f.info == ">café ☕".encode()
+    assert str(f) == "N0CALL>APRS:>café ☕"
+
+
+def test_Frame_from_str_other_encoding():
+    f = Frame.from_str("N0CALL>APRS:>café", encoding="latin-1")
     assert f.info == b">caf\xe9"
+    assert f.to_str("latin-1") == "N0CALL>APRS:>café"
+
+
+def test_non_utf8_info_round_trips():
+    """Bytes that aren't UTF-8 (Latin-1, binary) survive str() and back."""
+    f = Frame.ui(destination="APRS", source="N0CALL", info=b">caf\xe9 \xff\x00")
+    text = str(f)
+    assert text == "N0CALL>APRS:>caf\udce9 \udcff\x00"
+    assert Frame.from_str(text).info == f.info
+    assert text.encode("utf-8", "surrogateescape").endswith(b">caf\xe9 \xff\x00")
 
 
 # --- issue #20: at most 8 digipeaters in binary AX.25 ---
@@ -249,6 +265,16 @@ def test_Frame_too_many_digipeaters():
     raw[70:70] = last
     with pytest.raises(ValueError, match="at most 8"):
         Frame.from_bytes(bytes(raw))
+
+
+# --- ax253#34: keyword-only ui() ---
+
+
+def test_ui_is_keyword_only():
+    with pytest.raises(TypeError):
+        Frame.ui("APRS", "N0CALL")  # ty: ignore[missing-argument, too-many-positional-arguments]
+    frame = Frame.ui(source="N0CALL", destination="APRS")
+    assert str(frame) == "N0CALL>APRS:"
 
 
 # --- ax253#31: evolve and display text ---

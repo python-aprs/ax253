@@ -43,9 +43,16 @@ def valid_ssid(instance, attribute, value):
         raise ValueError(f"ssid must be 0-15, got {value!r}")
 
 
-@define(slots=True, frozen=True)
+@define(slots=True, frozen=True, eq=False)
 class Address:
-    """A source, destination, or path entry in an AX.25 frame."""
+    """
+    A source, destination, or path entry in an AX.25 frame.
+
+    Addresses are equal when they name the same station: callsign (ignoring
+    case) and SSID. The ``digi`` and ``a7_hldc`` flags describe where the
+    address sits in a frame, not the station, so they don't count. An
+    address also equals its text: ``frame.source == "N0CALL-7"``.
+    """
 
     callsign: bytes = field(validator=valid_callsign)
     """
@@ -59,7 +66,7 @@ class Address:
     digi: bool = field(default=False, converter=bool)
     """If true, indicates that this address has digipeated the packet."""
     # The high order bit of HLDC; True indicates end of address information.
-    a7_hldc: bool = field(default=False, converter=bool, repr=False)
+    a7_hldc: bool = field(default=False, converter=bool, repr=False, kw_only=True)
 
     @classmethod
     def from_bytes(cls, ax25_address: bytes, **kwargs: Any) -> Self:
@@ -145,6 +152,26 @@ class Address:
     def base(self) -> str:
         """The callsign without its SSID: ``"KF7HVM"`` for ``KF7HVM-9``."""
         return self.call.partition("-")[0]
+
+    def _station(self) -> tuple[bytes, int]:
+        return self.callsign.upper(), self.ssid
+
+    def __eq__(self, other: object) -> bool:
+        if isinstance(other, str):
+            try:
+                other = Address.from_str(other)
+            except ValueError:
+                return False
+        if not isinstance(other, Address):
+            return NotImplemented
+        return self._station() == other._station()
+
+    def __ne__(self, other: object) -> bool:
+        result = self.__eq__(other)
+        return result if result is NotImplemented else not result
+
+    def __hash__(self) -> int:
+        return hash(self._station())
 
     def __str__(self) -> str:
         """Encode address as TNC2 string."""

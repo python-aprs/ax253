@@ -35,8 +35,19 @@ N0CALL-7>APRS,WIDE1-1*,WIDE2-1:>On the air
 ``Frame.ui`` builds a new UI frame; the ``*`` convention marks digipeaters
 that have already repeated it:
 
->>> print(Frame.ui("APRS", "N0CALL", path=["WIDE1-1"], info=b">hello"))
+>>> print(Frame.ui(source="N0CALL", destination="APRS", path=["WIDE1-1"], info=b">hello"))
 N0CALL>APRS,WIDE1-1:>hello
+
+TNC2 text is UTF-8: ``from_str`` encodes the info field as UTF-8 and
+``str(frame)`` decodes it. Bytes that aren't UTF-8 (Latin-1 text, binary)
+become surrogate escapes, so they still round-trip unchanged. Pass
+``encoding=`` to ``from_str``, ``to_str``, ``TNC2Decode`` or
+``TNC2Protocol`` for another encoding.
+
+>>> print(Frame.from_str("N0CALL>APRS:>café ☕"))
+N0CALL>APRS:>café ☕
+>>> Frame.from_str("N0CALL>APRS:>café", encoding="latin-1").info
+b'>caf\xe9'
 
 Addresses
 =========
@@ -54,6 +65,12 @@ Addresses
 
 >>> print(frame.evolve(path=[*frame.path, "qAR", "N0CALL-10"]))
 N0CALL-7>APRS,WIDE1-1*,WIDE2-1,qAR,N0CALL-10:>On the air
+
+Addresses compare by station (callsign, ignoring case, and SSID), and
+compare equal to their text:
+
+>>> frame.source == "n0call-7"
+True
 
 Streams
 =======

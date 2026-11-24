@@ -60,7 +60,9 @@ def test_corpus_is_nonempty():
 def test_decode_matches_direwolf_monitor(f):
     """Decoding Dire Wolf's bytes yields the text Dire Wolf itself prints."""
     frame = Frame.from_bytes(ax25(f))
-    assert str(frame).encode("latin1") == direwolf_monitor_to_bytes(f["direwolf_monitor"])
+    assert str(frame).encode("utf-8", "surrogateescape") == direwolf_monitor_to_bytes(
+        f["direwolf_monitor"]
+    )
 
 
 @pytest.mark.parametrize("f", FRAMES, ids=_id)
@@ -105,13 +107,17 @@ def test_encode_matches_direwolf(f):
     The destination/source C bits are masked: Dire Wolf 1.7 sets both, while
     ax253 clears both; either is accepted on the air.
     """
-    frame = Frame.from_str(direwolf_monitor_to_bytes(f["input"]).decode("latin1"))
+    frame = Frame.from_str(
+        direwolf_monitor_to_bytes(f["input"]).decode("utf-8", "surrogateescape")
+    )
     assert mask_command_bits(bytes(frame)) == mask_command_bits(ax25(f))
 
 
 @pytest.mark.parametrize("f", FRAMES, ids=_id)
 def test_text_round_trip(f):
-    text = direwolf_monitor_to_bytes(f["direwolf_monitor"]).decode("latin1")
+    text = direwolf_monitor_to_bytes(f["direwolf_monitor"]).decode(
+        "utf-8", "surrogateescape"
+    )
     assert str(Frame.from_str(text)) == text
 
 
