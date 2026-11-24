@@ -2,6 +2,7 @@
 
 import enum
 import logging
+import re
 from collections.abc import Iterable, Sequence
 from typing import Any, Self, SupportsBytes
 
@@ -125,6 +126,11 @@ def _encode_info_text(text: str) -> bytes:
         return text.encode("latin1")
     except UnicodeEncodeError:
         return text.encode("utf-8")
+
+
+def _first_line(info: bytes) -> bytes:
+    """``info`` up to its first CR or LF."""
+    return re.split(rb"[\r\n]", info, maxsplit=1)[0]
 
 
 def bytes_or_encode_utf8(v):
@@ -279,6 +285,10 @@ class Frame:
         Serialize the frame as TNC2 monitor format.
 
         Only the last digipeater with its H bit set is marked with ``*``.
+
+        The info field ends at its first CR or LF, as APRS-IS igates cut it,
+        so the text is always one line: a CR or LF heard on RF can't start a
+        second, forged packet when the text is sent on to APRS-IS.
         """
         path = list(self.path or [])
         last_repeated = max((ix for ix, p in enumerate(path) if p.digi), default=-1)
@@ -289,7 +299,7 @@ class Frame:
         return "%s>%s:%s" % (
             str(self.source.evolve(digi=False)),
             ",".join(full_path),
-            bytes(self.info).decode("latin1"),
+            _first_line(bytes(self.info)).decode("latin1"),
         )
 
 
@@ -312,7 +322,14 @@ class AX25BytestreamDecoder(GenericDecoder[Frame]):
     before the bytes are dropped as corrupt.
     """
 
+    max_buffered_bytes: int = field(default=4 * MAX_FRAME_WITH_FCS, kw_only=True)
+    """
+    Most bytes kept while waiting for a flag. Past this, the buffered bytes
+    are dropped up to the next flag, so a stream with no flags (the wrong
+    baud rate, the wrong service on the port) can't grow without limit.
+    """
     _last_pframe: bytes = field(default=b"", init=False)
+    _discarding: bool = field(default=False, init=False, repr=False)
 
     @staticmethod
     def decode_frames(frame: bytes) -> Iterable[Frame]:
@@ -356,6 +373,12 @@ class AX25BytestreamDecoder(GenericDecoder[Frame]):
         :return: an iterable of decoded frames
         """
         data, self._last_pframe = self._last_pframe + new_data, b""
+        if self._discarding:
+            # skip the rest of an overlong run of bytes, up to the next flag
+            flag = data.find(AX25_FLAG)
+            if flag < 0:
+                return
+            data, self._discarding = data[flag:], False
         start = self._skip_flags(data, 0)
         while start < len(data):
             end = data.find(AX25_FLAG, start)
@@ -395,6 +418,9 @@ class AX25BytestreamDecoder(GenericDecoder[Frame]):
             _logger.debug("Dropping frame with bad FCS: %r", data[start:end])
             start = next_start
         self._last_pframe = data[start:]
+        if len(self._last_pframe) > self.max_buffered_bytes:
+            _logger.debug("Dropping %d bytes without a flag", len(self._last_pframe))
+            self._last_pframe, self._discarding = b"", True
 
     def flush(self) -> Iterable[Frame]:
         """
@@ -403,6 +429,7 @@ class AX25BytestreamDecoder(GenericDecoder[Frame]):
         Buffered bytes are decoded only if they end in a valid FCS.
         """
         buffered, self._last_pframe = self._last_pframe, b""
+        self._discarding = False
         payload = self._check(buffered)
         if payload is not None:
             yield from self._decode_payload(payload)

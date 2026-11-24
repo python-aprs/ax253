@@ -251,6 +251,32 @@ def test_Frame_too_many_digipeaters():
         Frame.from_bytes(bytes(raw))
 
 
+# --- issue #27: a stream with no flags can't grow the buffer forever ---
+
+
+def test_buffer_is_bounded_without_flags():
+    decoder = AX25BytestreamDecoder()
+    for _ in range(100):
+        assert list(decoder.update(b"A" * 1000)) == []
+        assert len(decoder._last_pframe) <= decoder.max_buffered_bytes
+
+
+def test_resyncs_at_the_next_flag_after_dropping():
+    decoder = AX25BytestreamDecoder(max_buffered_bytes=64)
+    assert list(decoder.update(b"A" * 100)) == []
+    assert list(decoder.update(b"C" * 10)) == []
+    # the rest of the overlong run is skipped too, then decoding resumes
+    assert list(decoder.update(b"B" * 100 + hdlc(F1))) == [F1]
+    assert list(decoder.update(hdlc(F2))) == [F2]
+
+
+def test_long_frame_split_across_reads_is_kept():
+    decoder = AX25BytestreamDecoder()
+    encoded = hdlc(F1)
+    assert list(decoder.update(encoded[:10])) == []
+    assert list(decoder.update(encoded[10:])) == [F1]
+
+
 # --- issue #28: frames are hashable ---
 
 

@@ -1,8 +1,11 @@
 """Test decode CRLF delimited UI packets"""
 
+import asyncio
+
 import pytest
 
 from ax253 import Address, Frame, TNC2Decode
+from ax253.tnc2 import TNC2Protocol
 
 idiotv = dict(
     frames=b"""
@@ -139,3 +142,30 @@ def test_tnc2_decode(packet_data, exp_frames, exp_exception):
         if exp_exception:
             assert exp_exception in str(exc)
         raise
+
+
+@pytest.mark.parametrize("eol", ["\r", "\n", "\r\n"])
+def test_str_ends_info_at_line_break(eol):
+    """
+    Issue #26: a CR or LF in the info field (e.g. heard on RF) must not
+    start a second, forged packet in TNC2 text sent to APRS-IS.
+    """
+    frame = Frame.ui("APRS", "N0CALL", [], f">hi{eol}EVIL>APRS::N0CALL   :pwned{{1")
+    assert str(frame) == "N0CALL>APRS:>hi"
+    assert frame.info.endswith(b"pwned{1")  # the frame itself is unchanged
+
+
+def test_tnc2_protocol_writes_one_line_per_frame():
+    written = []
+
+    class Transport(asyncio.Transport):
+        def write(self, data):
+            written.append(data)
+
+    async def write_frame():
+        protocol = TNC2Protocol(transport=Transport())
+        protocol.write(Frame.ui("APRS", "N0CALL", [], b">x\rEVIL>APRS:>y"))
+
+    asyncio.run(write_frame())
+    decoded = list(TNC2Decode().update(b"".join(written)))
+    assert [str(f) for f in decoded] == ["N0CALL>APRS:>x"]
