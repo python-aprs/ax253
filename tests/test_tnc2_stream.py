@@ -1,5 +1,6 @@
 """TNC2 / APRS-IS text: stream framing and address fidelity."""
 
+import asyncio
 import pathlib
 
 import pytest
@@ -163,6 +164,10 @@ class _Transport:
 
 @pytest.mark.parametrize("encoding", ["utf-8", "latin-1"])
 def test_protocol_encoding(encoding):
+    asyncio.run(_protocol_encoding(encoding))
+
+
+async def _protocol_encoding(encoding):
     from ax253 import TNC2Protocol
 
     protocol = TNC2Protocol(encoding=encoding)
@@ -174,3 +179,29 @@ def test_protocol_encoding(encoding):
     protocol.write(bytes(frame))  # any bytes-able frame
     line = b"N0CALL>APRS:" + info + b"\r\n"
     assert protocol.transport.written == line * 2  # ty: ignore[missing-attribute]
+
+
+# --- issue #27: a stream with no line ends can't grow the buffer forever ---
+
+
+def test_buffer_is_bounded_without_line_ends():
+    decoder = TNC2Decode()
+    for _ in range(100):
+        assert list(decoder.update(b"A" * 1000)) == []
+        assert len(decoder._buffer) <= decoder.max_line_length
+
+
+def test_overlong_line_is_dropped_whole():
+    decoder = TNC2Decode(max_line_length=64)
+    assert list(decoder.update(b"X" * 100)) == []
+    # the tail of the dropped line must not decode as a packet of its own
+    frames = list(decoder.update(b"N0CALL>APRS:>tail\r\nN0CALL>APRS:>ok\r\n"))
+    assert [str(f) for f in frames] == ["N0CALL>APRS:>ok"]
+
+
+def test_overlong_line_dropped_across_reads():
+    decoder = TNC2Decode(max_line_length=64)
+    assert list(decoder.update(b"X" * 100)) == []
+    assert list(decoder.update(b"Y" * 100)) == []
+    assert [str(f) for f in decoder.update(b"\nN0CALL>APRS:>ok\n")] == ["N0CALL>APRS:>ok"]
+    assert list(decoder.flush()) == []

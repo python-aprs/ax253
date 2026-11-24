@@ -1,6 +1,7 @@
 """asyncio Protocol for extracting individual frames from CRLF-delimited TNC2."""
 
 import logging
+import re
 from collections.abc import Iterable
 from typing import SupportsBytes
 
@@ -16,6 +17,10 @@ __license__ = "Apache License, Version 2.0"
 
 log = logging.getLogger(__name__)
 
+# APRS-IS lines are at most 512 bytes; leave plenty of headroom
+DEFAULT_MAX_LINE_LENGTH = 8192
+_LINE_END = re.compile(rb"[\r\n]")
+
 
 @define
 class TNC2Decode(GenericDecoder[Frame]):
@@ -30,10 +35,18 @@ class TNC2Decode(GenericDecoder[Frame]):
 
     Lines are ``encoding`` text, UTF-8 by default. Bytes that aren't valid in
     it are kept as they are in the frame's info field.
+
+    A partial line longer than ``max_line_length`` is dropped, along with
+    the rest of that line, so a stream that never sends a line end (the
+    wrong service on the port, a serial port at the wrong speed) can't
+    grow the buffer without limit.
     """
 
     encoding: str = field(default=TNC2_ENCODING, kw_only=True)
+    max_line_length: int = field(default=DEFAULT_MAX_LINE_LENGTH, kw_only=True)
+    """Longest partial line kept while waiting for its line end, in bytes."""
     _buffer: bytes = field(default=b"", init=False, repr=False)
+    _discarding: bool = field(default=False, init=False, repr=False)
 
     def decode_frames(self, frame: bytes) -> Iterable[Frame]:
         try:
@@ -52,19 +65,29 @@ class TNC2Decode(GenericDecoder[Frame]):
 
     def update(self, new_data: bytes) -> Iterable[Frame]:
         data = self._buffer + new_data
-        lines = data.splitlines(keepends=True)
         self._buffer = b""
+        if self._discarding:
+            # skip the rest of an overlong line, up to its line end
+            match = _LINE_END.search(data)
+            if match is None:
+                return
+            data, self._discarding = data[match.start() :], False
+        lines = data.splitlines(keepends=True)
         if lines and not lines[-1].endswith((b"\n", b"\r")):
             self._buffer = lines.pop()
         elif data.endswith(b"\r"):
             # CR may be the first half of a CRLF split across reads; the
             # LF will arrive as an empty line and be ignored
             pass
+        if len(self._buffer) > self.max_line_length:
+            log.debug("Dropping %d bytes without a line end", len(self._buffer))
+            self._buffer, self._discarding = b"", True
         for line in lines:
             yield from self._decode_line(line.rstrip(b"\r\n"))
 
     def flush(self) -> Iterable[Frame]:
         buffered, self._buffer = self._buffer, b""
+        self._discarding = False
         yield from self._decode_line(buffered)
 
 
