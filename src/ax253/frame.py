@@ -117,8 +117,72 @@ class Control:
         """The Poll/Final bit (0x10 in modulo-8 control fields)."""
         return bool(self.v[0] & 0x10)
 
+    @classmethod
+    def i(cls, n_s: int, n_r: int, poll: bool = False) -> "Control":
+        """
+        The control byte of an I (information) frame.
+
+        >>> Control.i(n_s=2, n_r=5, poll=True)
+        Control(v=b'\\xb4')
+        """
+        _check_sequence(n_s=n_s, n_r=n_r)
+        return cls((n_r << 5) | (0x10 if poll else 0) | (n_s << 1))
+
+    @classmethod
+    def s(cls, ftype: FrameType, n_r: int, poll_final: bool = False) -> "Control":
+        """
+        The control byte of a supervisory frame (RR, RNR, REJ or SREJ).
+
+        >>> Control.s(FrameType.S_RR, n_r=3).ftype
+        <FrameType.S_RR: 1>
+        """
+        if ftype not in _S_TYPES:
+            raise ValueError(f"{ftype!r} is not a supervisory frame type")
+        _check_sequence(n_r=n_r)
+        return cls((n_r << 5) | (0x10 if poll_final else 0) | ftype.value)
+
+    @classmethod
+    def u(cls, ftype: FrameType, poll_final: bool = False) -> "Control":
+        """
+        The control byte of an unnumbered frame (SABM, UA, DISC, DM, ...).
+
+        >>> Control.u(FrameType.U_SABM, poll_final=True)
+        Control(v=b'?')
+        """
+        if ftype is FrameType.I or ftype in _S_TYPES:
+            raise ValueError(f"{ftype!r} is not an unnumbered frame type")
+        return cls(ftype.value | (0x10 if poll_final else 0))
+
     def __bytes__(self) -> bytes:
         return self.v
+
+
+_S_TYPES = frozenset({FrameType.S_RR, FrameType.S_RNR, FrameType.S_REJ, FrameType.S_SREJ})
+
+
+def _check_sequence(**numbers: int) -> None:
+    for name, value in numbers.items():
+        if not 0 <= value <= 7:
+            raise ValueError(f"{name} must be 0-7 (modulo 8), got {value!r}")
+
+
+# Dire Wolf's monitor names for each frame type
+_MONITOR_NAMES = {
+    FrameType.I: "I",
+    FrameType.S_RR: "RR",
+    FrameType.S_RNR: "RNR",
+    FrameType.S_REJ: "REJ",
+    FrameType.S_SREJ: "SREJ",
+    FrameType.U_SABM: "SABM",
+    FrameType.U_SABME: "SABME",
+    FrameType.U_DISC: "DISC",
+    FrameType.U_DM: "DM",
+    FrameType.U_UA: "UA",
+    FrameType.U_FRMR: "FRMR",
+    FrameType.U_UI: "UI",
+    FrameType.U_XID: "XID",
+    FrameType.U_TEST: "TEST",
+}
 
 
 TNC2_ENCODING = "utf-8"
@@ -212,6 +276,90 @@ class Frame:
             ],
             info=info,
         )
+
+    @classmethod
+    def link(
+        cls,
+        *,
+        destination: Address | str,
+        source: Address | str,
+        path: Sequence[Address | str] | None = None,
+        control: Control | int,
+        command: bool,
+        info: bytes = b"",
+        pid: bytes | int = NO_PROTOCOL_ID,
+    ) -> Self:
+        """
+        Create a connected-mode (link) frame: I, S or U.
+
+        ``command`` sets the AX.25 v2 command/response bits. ``pid`` is only
+        sent in I frames.
+
+        >>> frame = Frame.link(destination="N0BBB", source="N0CCC",
+        ...                    control=Control.u(FrameType.U_SABM, True), command=True)
+        >>> frame.describe()
+        'N0CCC>N0BBB:(SABM cmd, p=1)'
+        """
+        control = Control.from_any(control)
+        ui = cls.ui(destination=destination, source=source, path=path, info=info)
+        return evolve(
+            ui,
+            control=control,
+            pid=pid if not control.v[0] & 0x01 else None,  # I frames only
+            command_response=(command, not command),
+        )
+
+    @property
+    def is_response(self) -> bool:
+        """True for an AX.25 v2 response (C bits 0/1); False for a command."""
+        return self.command_response == (False, True)
+
+    @property
+    def is_command(self) -> bool:
+        """True unless this is an AX.25 v2 response (v1 frames count as commands)."""
+        return not self.is_response
+
+    @property
+    def reply_path(self) -> tuple[Address, ...]:
+        """
+        The digipeater path back to the sender: this frame's path reversed,
+        with no H bits set.
+
+        >>> [str(p) for p in Frame.from_str("A>B,DIGI1*,DIGI2*:").reply_path]
+        ['DIGI2', 'DIGI1']
+        """
+        return tuple(p.evolve(digi=False) for p in reversed(self.path))
+
+    def describe(self, encoding: str = TNC2_ENCODING) -> str:
+        """
+        The frame as Dire Wolf's monitor prints it, with link frames spelled
+        out: ``N0CCC>N0BBB:(I cmd, n(s)=0, n(r)=0, p=0, pid=0xf0)hello``.
+
+        UI frames are the plain TNC2 text of ``to_str()``.
+        """
+        try:
+            ftype = self.control.ftype
+        except ValueError:
+            ftype = None
+        text = self.to_str(encoding)
+        if ftype is FrameType.U_UI:
+            return text
+        # the address field never holds a ":", so this is "SRC>DEST,PATH:"
+        header = text.partition(":")[0] + ":"
+        if ftype is None:
+            return f"{header}(control={self.control.v[0]:#04x})"
+        kind = "res" if self.is_response else "cmd"
+        pf = ("f" if self.is_response else "p") + f"={int(self.control.p_f)}"
+        if ftype is FrameType.I:
+            fields = f"n(s)={self.control.n_s}, n(r)={self.control.n_r}, {pf}"
+            if self.pid is not None:
+                fields += f", pid={self.pid[0]:#04x}"
+        elif ftype in _S_TYPES:
+            fields = f"n(r)={self.control.n_r}, {pf}"
+        else:
+            fields = pf
+        info = text.partition(":")[2]
+        return f"{header}({_MONITOR_NAMES[ftype]} {kind}, {fields}){info}"
 
     @classmethod
     def from_bytes(cls, ax25_bytes: bytes) -> Self:

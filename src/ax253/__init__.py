@@ -2,7 +2,8 @@ r"""
 AX.25 frames and the TNC2 text format.
 
 ``ax253`` encodes and decodes the AX.25 UI frames that APRS and other packet
-radio applications send. It is the bottom layer of `kiss3`_ (KISS TNCs) and
+radio applications send, and runs AX.25 connections (``ax253.link``). It is
+the bottom layer of `kiss3`_ (KISS TNCs) and
 `aprs3`_ (APRS), and does no I/O of its own beyond the asyncio protocols.
 
 .. _kiss3: https://github.com/python-aprs/kiss3
@@ -89,6 +90,19 @@ calls:
 ``FrameDecodeProtocol`` wraps a decoder as an asyncio protocol, with an async
 ``read()``; ``SyncFrameDecode`` is the base of the blocking transports in
 kiss3 and aprs3.
+
+Connected mode
+==============
+
+``ax253.link`` runs AX.25 connections between two stations over a frame
+protocol (such as kiss3's ``KISSProtocol``), as asyncio streams. Its
+``DataLink`` state machine builds the link frames with ``Frame.link``:
+
+>>> from ax253 import Control, FrameType
+>>> sabm = Frame.link(destination="N0BBB", source="N0CALL",
+...                   control=Control.u(FrameType.U_SABM, poll_final=True), command=True)
+>>> sabm.describe()
+'N0CALL>N0BBB:(SABM cmd, p=1)'
 """
 
 from importlib.metadata import version

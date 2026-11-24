@@ -92,9 +92,50 @@ class FrameDecodeProtocol(asyncio.Protocol, Generic[_T]):
     """
     dropped_frames: int = field(default=0, init=False)
     """Number of frames dropped because nobody read them in time."""
+    _frame_handlers: list[Callable[[_T], bool]] = field(factory=list, init=False)
+    _close_handlers: list[Callable[[Exception | None], None]] = field(
+        factory=list, init=False
+    )
+
+    def add_frame_handler(
+        self,
+        handler: Callable[[_T], bool],
+        on_close: Callable[[Exception | None], None] | None = None,
+    ) -> None:
+        """
+        Offer each decoded frame to ``handler`` before it is queued for ``read()``.
+
+        A handler returns True when it has consumed the frame, which then
+        isn't queued or offered to later handlers. The AX.25 link layer
+        (``ax253.link``) uses this to take the connected-mode frames
+        addressed to it while UI frames still reach ``read()``.
+
+        ``on_close`` is called with the exception (or None) when the
+        connection is lost.
+        """
+        self._frame_handlers.append(handler)
+        if on_close is not None:
+            self._close_handlers.append(on_close)
+
+    def remove_frame_handler(
+        self,
+        handler: Callable[[_T], bool],
+        on_close: Callable[[Exception | None], None] | None = None,
+    ) -> None:
+        """Stop offering frames to ``handler`` (added by ``add_frame_handler``)."""
+        if handler in self._frame_handlers:
+            self._frame_handlers.remove(handler)
+        if on_close is not None and on_close in self._close_handlers:
+            self._close_handlers.remove(on_close)
 
     def _queue_frame(self, frame: _T) -> None:
         self.frame_decoded(frame)
+        for handler in list(self._frame_handlers):
+            try:
+                if handler(frame):
+                    return
+            except Exception:  # pylint: disable=broad-except
+                log.exception("Frame handler %r failed on %r", handler, frame)
         limit = self.max_queued_frames
         if limit is not None:
             while self.frames.qsize() >= max(limit, 1):
@@ -139,6 +180,11 @@ class FrameDecodeProtocol(asyncio.Protocol, Generic[_T]):
         for frame in self.decoder.flush():
             self._queue_frame(frame)
         self.frames.put_nowait(EOF)
+        for on_close in list(self._close_handlers):
+            try:
+                on_close(exc)
+            except Exception:  # pylint: disable=broad-except
+                log.exception("Close handler %r failed", on_close)
 
     async def read(
         self,
