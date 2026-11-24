@@ -38,6 +38,17 @@ that have already repeated it:
 >>> print(Frame.ui(source="N0CALL", destination="APRS", path=["WIDE1-1"], info=b">hello"))
 N0CALL>APRS,WIDE1-1:>hello
 
+TNC2 text is UTF-8: ``from_str`` encodes the info field as UTF-8 and
+``str(frame)`` decodes it. Bytes that aren't UTF-8 (Latin-1 text, binary)
+become surrogate escapes, so they still round-trip unchanged. Pass
+``encoding=`` to ``from_str``, ``to_str``, ``TNC2Decode`` or
+``TNC2Protocol`` for another encoding.
+
+>>> print(Frame.from_str("N0CALL>APRS:>café ☕"))
+N0CALL>APRS:>café ☕
+>>> Frame.from_str("N0CALL>APRS:>café", encoding="latin-1").info
+b'>caf\xe9'
+
 Addresses
 =========
 

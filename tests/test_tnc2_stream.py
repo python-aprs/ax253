@@ -132,3 +132,45 @@ def test_address_invalid_text(bad):
 def test_address_ssid_range_enforced():
     with pytest.raises(ValueError):
         Address(callsign=b"N0CALL", ssid=16)
+
+
+# --- TNC2 text is UTF-8 by default; the encoding is configurable ---
+
+
+def test_decoder_reads_utf8_and_keeps_other_bytes():
+
+    lines = ">café ☕".encode() + b"\r\n"
+    lines += b"N0CALL>APRS:>caf\xe9\r\n"
+    frames = list(TNC2Decode().update(b"N0CALL>APRS:" + lines))
+    assert [f.info for f in frames] == [">café ☕".encode(), b">caf\xe9"]
+    assert str(frames[0]) == "N0CALL>APRS:>café ☕"
+
+
+def test_decoder_encoding():
+
+    (frame,) = TNC2Decode(encoding="latin-1").update(b"N0CALL>APRS:>caf\xe9\r\n")
+    assert frame.info == b">caf\xe9"
+    assert frame.to_str("latin-1") == "N0CALL>APRS:>café"
+
+
+class _Transport:
+    def __init__(self):
+        self.written = b""
+
+    def write(self, data):
+        self.written += data
+
+
+@pytest.mark.parametrize("encoding", ["utf-8", "latin-1"])
+def test_protocol_encoding(encoding):
+    from ax253 import TNC2Protocol
+
+    protocol = TNC2Protocol(encoding=encoding)
+    assert protocol.decoder.encoding == encoding  # ty: ignore[missing-attribute]
+    protocol.transport = _Transport()  # ty: ignore[invalid-assignment]
+    info = b">caf\xe9" if encoding == "latin-1" else ">café".encode()
+    frame = Frame.ui(destination="APRS", source="N0CALL", info=info)
+    protocol.write(frame)
+    protocol.write(bytes(frame))  # any bytes-able frame
+    line = b"N0CALL>APRS:" + info + b"\r\n"
+    assert protocol.transport.written == line * 2  # ty: ignore[missing-attribute]

@@ -4,10 +4,10 @@ import logging
 from collections.abc import Iterable
 from typing import SupportsBytes
 
-from attrs import define, field
+from attrs import Factory, define, field
 
 from .decode import FrameDecodeProtocol, GenericDecoder
-from .frame import Frame
+from .frame import TNC2_ENCODING, Frame
 
 __author__ = "Masen Furer KF7HVM <kf7hvm@0x26.net>"
 __copyright__ = "Copyright 2022 Masen Furer and Contributors"
@@ -27,14 +27,19 @@ class TNC2Decode(GenericDecoder[Frame]):
     Lines may be split across any number of ``update()`` calls (TCP delivers
     a byte stream, not lines); an incomplete trailing line is buffered until
     its terminator arrives, or until ``flush()``.
+
+    Lines are ``encoding`` text, UTF-8 by default. Bytes that aren't valid in
+    it are kept as they are in the frame's info field.
     """
 
+    encoding: str = field(default=TNC2_ENCODING, kw_only=True)
     _buffer: bytes = field(default=b"", init=False, repr=False)
 
-    @staticmethod
-    def decode_frames(frame: bytes) -> Iterable[Frame]:
+    def decode_frames(self, frame: bytes) -> Iterable[Frame]:
         try:
-            yield Frame.from_str(frame.decode("latin1"))
+            yield Frame.from_str(
+                frame.decode(self.encoding, "surrogateescape"), encoding=self.encoding
+            )
         except Exception:
             log.debug("Ignore frame decode error %r", frame, exc_info=True)
 
@@ -65,10 +70,21 @@ class TNC2Decode(GenericDecoder[Frame]):
 
 @define
 class TNC2Protocol(FrameDecodeProtocol[Frame]):
-    """Protocol for decoding a stream of TNC2 format packets."""
+    """
+    Protocol for decoding a stream of TNC2 format packets.
 
-    decoder: GenericDecoder[Frame] = field(factory=TNC2Decode)
+    ``encoding`` is the text encoding of the lines (UTF-8 by default); the
+    default decoder uses it too.
+    """
+
+    encoding: str = field(default=TNC2_ENCODING, kw_only=True)
+    decoder: GenericDecoder[Frame] = field(
+        default=Factory(lambda self: TNC2Decode(encoding=self.encoding), takes_self=True)
+    )
 
     def write(self, frame: SupportsBytes) -> None:
         """Write the frame to the transport as a TNC2 line."""
-        self._connected_transport().write(str(frame).encode("latin1") + b"\r\n")
+        if not isinstance(frame, Frame):
+            frame = Frame.from_bytes(bytes(frame))
+        line = frame.to_str(self.encoding).encode(self.encoding, "surrogateescape")
+        self._connected_transport().write(line + b"\r\n")

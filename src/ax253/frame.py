@@ -120,11 +120,8 @@ class Control:
         return self.v
 
 
-def _encode_info_text(text: str) -> bytes:
-    try:
-        return text.encode("latin1")
-    except UnicodeEncodeError:
-        return text.encode("utf-8")
+TNC2_ENCODING = "utf-8"
+"""The default text encoding of TNC2 lines (and of APRS-IS)."""
 
 
 def bytes_or_encode_utf8(v):
@@ -258,14 +255,13 @@ class Frame:
         return b"".join(encoded_frame)
 
     @classmethod
-    def from_str(cls, ax25_text: str) -> Self:
+    def from_str(cls, ax25_text: str, encoding: str = TNC2_ENCODING) -> Self:
         """
         Decode the frame from TNC2 monitor format.
 
-        TNC2 text from the stream decoders holds the info bytes decoded as
-        Latin-1, so they are encoded back the same way. Text that can't be
-        Latin-1 (typed by a user, e.g. "€") is encoded as UTF-8, the usual
-        encoding on APRS-IS.
+        The info field is ``encoding`` text (UTF-8 by default). Bytes that
+        aren't valid in it travel as surrogate escapes (as ``to_str``
+        produces them), so any info field round-trips unchanged.
         """
         source_text, gt, rem = ax25_text.partition(">")
         address_field, colon, info_text = rem.partition(":")
@@ -274,12 +270,21 @@ class Frame:
             destination=destination_text,
             source=source_text,
             path=paths_text,
-            info=_encode_info_text(info_text),
+            info=info_text.encode(encoding, "surrogateescape"),
         )
 
     def __str__(self) -> str:
+        """The frame in TNC2 monitor format, with UTF-8 text: ``to_str()``."""
+        return self.to_str()
+
+    def to_str(self, encoding: str = TNC2_ENCODING) -> str:
         """
         Serialize the frame as TNC2 monitor format.
+
+        The info field is decoded as ``encoding`` (UTF-8 by default). Bytes
+        that aren't valid in it become surrogate escapes, which
+        ``from_str`` and ``.encode(encoding, "surrogateescape")`` turn back
+        into the same bytes.
 
         Only the last digipeater with its H bit set is marked with ``*``.
         """
@@ -292,7 +297,7 @@ class Frame:
         return "%s>%s:%s" % (
             str(self.source.evolve(digi=False)),
             ",".join(full_path),
-            bytes(self.info).decode("latin1"),
+            bytes(self.info).decode(encoding, "surrogateescape"),
         )
 
 
