@@ -331,3 +331,31 @@ def test_path_is_a_tuple_whatever_it_was_built_from():
     )
     assert isinstance(frame.path, tuple)
     assert attr.evolve(frame, path=[]).path == ()
+
+
+@pytest.mark.parametrize(
+    "line",
+    [
+        # the TNC monitor convention: only the last used hop is marked
+        "N0CALL>APRS,N1ABC-1,WIDE1*,WIDE2-1,qAR,K1ABC:>x",
+        # many igates mark every used hop (ax253#41)
+        "WD4ITN-4>APMI03,N8JEP-4*,W4VA-13*,WIDE2*,qAR,KG4GIY:>x",
+        "BG5IOR-5>RXTQS9,BG5JAB-3*,WIDE1*,WIDE2-1,BI7ALG*,qAS,BA7NNC-10:>x",
+    ],
+)
+def test_tnc2_path_marks_round_trip(line):
+    assert str(Frame.from_str(line)) == line
+
+
+def test_every_used_hop_has_its_h_bit():
+    frame = Frame.from_str("N0CALL>APRS,N1ABC-1,WIDE1*,WIDE2-1:>x")
+    assert [p.digi for p in frame.path] == [True, True, False]
+    # from AX.25 bytes there are no marks: only the last used hop is starred
+    assert str(Frame.from_bytes(bytes(frame))) == "N0CALL>APRS,N1ABC-1,WIDE1*,WIDE2-1:>x"
+
+
+def test_repeating_a_frame_marks_the_new_hop():
+    frame = Frame.from_str("N0CALL>APRS,N1ABC-1*,WIDE1*,WIDE2-1:>x")
+    path = list(frame.path)
+    path[2] = path[2].evolve(digi=True)
+    assert str(frame.evolve(path=path)) == "N0CALL>APRS,N1ABC-1*,WIDE1*,WIDE2-1*:>x"
