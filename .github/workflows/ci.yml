@@ -33,3 +33,16 @@ jobs:
         python-version: ${{ matrix.python-version }}
     - run: uv sync --locked
     - run: uv run pytest
+
+  direwolf:
+    # AX.25 connected mode against Dire Wolf's implementation, over a fake
+    # radio between two Dire Wolf instances (tests/direwolf_rig.py)
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v4
+      with:
+        fetch-depth: 0  # setuptools_scm needs tags
+    - uses: astral-sh/setup-uv@v6
+    - run: sudo apt-get update && sudo apt-get install -y direwolf
+    - run: uv sync --locked
+    - run: uv run pytest tests/test_link_direwolf.py --no-cov -v

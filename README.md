@@ -25,6 +25,40 @@ True
 [`examples/ax25_convert.py`](./examples/ax25_convert.py) converts between
 TNC2 text and AX.25 hex, which helps when reading a TNC capture.
 
+## Connected mode
+
+`ax253.link` runs AX.25 connections (SABM/UA, I frames, RR/RNR/REJ, T1/T3
+retries) over any frame protocol, such as a KISS TNC from kiss3. Connections
+are asyncio streams, like `asyncio.open_connection` and `asyncio.start_server`:
+
+```python
+import kiss
+from ax253.link import LinkEndpoint
+
+_, tnc = await kiss.create_tcp_connection("localhost", 8001)
+endpoint = LinkEndpoint(tnc, "N0CALL-1")
+
+# call another station
+reader, writer = await endpoint.connect("N0CALL-2", via=["WIDE1-1"])
+writer.write(b"hello\r")
+print(await reader.readuntil(b"\r"))
+writer.close()
+await writer.wait_closed()
+
+
+# or answer calls to N0CALL-1
+async def echo(reader, writer):
+    while line := await reader.readuntil(b"\r"):
+        writer.write(line)
+
+
+endpoint.serve(echo)
+```
+
+APRS UI frames still arrive through `tnc.read()`. Connections are modulo-8
+(AX.25 2.0); an AX.25 2.2 station such as Dire Wolf falls back to that
+automatically. The tests run against Dire Wolf when it's installed.
+
 Documentation: <https://python-aprs.org>
 
 ## Development
