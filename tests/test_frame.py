@@ -259,3 +259,49 @@ def test_frame_evolve_path():
     gated = frame.evolve(path=[*frame.path, "qAR", "N0CALL-10"])
     assert str(gated) == "N0CALL>APRS,WIDE1-1*,qAR,N0CALL-10:>hi"
     assert str(frame) == "N0CALL>APRS,WIDE1-1*:>hi"  # unchanged
+
+
+# --- issue #27: a stream with no flags can't grow the buffer forever ---
+
+
+def test_buffer_is_bounded_without_flags():
+    decoder = AX25BytestreamDecoder()
+    for _ in range(100):
+        assert list(decoder.update(b"A" * 1000)) == []
+        assert len(decoder._last_pframe) <= decoder.max_buffered_bytes
+
+
+def test_resyncs_at_the_next_flag_after_dropping():
+    decoder = AX25BytestreamDecoder(max_buffered_bytes=64)
+    assert list(decoder.update(b"A" * 100)) == []
+    assert list(decoder.update(b"C" * 10)) == []
+    # the rest of the overlong run is skipped too, then decoding resumes
+    assert list(decoder.update(b"B" * 100 + hdlc(F1))) == [F1]
+    assert list(decoder.update(hdlc(F2))) == [F2]
+
+
+def test_long_frame_split_across_reads_is_kept():
+    decoder = AX25BytestreamDecoder()
+    encoded = hdlc(F1)
+    assert list(decoder.update(encoded[:10])) == []
+    assert list(decoder.update(encoded[10:])) == [F1]
+
+
+# --- issue #28: frames are hashable ---
+
+
+def test_frames_are_hashable():
+    same = Frame.from_bytes(bytes(F1))
+    assert same == F1
+    assert hash(same) == hash(F1)
+    assert len({F1, same, F2, F3}) == 3
+
+
+def test_path_is_a_tuple_whatever_it_was_built_from():
+    frame = Frame(
+        destination=F1.destination,
+        source=F1.source,
+        path=[Address.from_str("WIDE1-1")],
+    )
+    assert isinstance(frame.path, tuple)
+    assert attr.evolve(frame, path=[]).path == ()
