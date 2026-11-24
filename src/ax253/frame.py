@@ -313,7 +313,9 @@ class Frame:
         ``from_str`` and ``.encode(encoding, "surrogateescape")`` turn back
         into the same bytes.
 
-        Only the last digipeater with its H bit set is marked with ``*``.
+        The last digipeater with its H bit set is marked with ``*``, as TNC
+        monitors do, and so is every repeated digipeater that had a ``*`` in
+        the text the frame was read from (many igates mark every used hop).
 
         The info field ends at its first CR or LF, as APRS-IS igates cut it,
         so the text is always one line: a CR or LF heard on RF can't start a
@@ -323,7 +325,10 @@ class Frame:
         last_repeated = max((ix for ix, p in enumerate(path) if p.digi), default=-1)
         full_path = [
             self.destination._to_str(False),
-            *(p._to_str(ix == last_repeated) for ix, p in enumerate(path)),
+            *(
+                p._to_str(p.digi and (ix == last_repeated or bool(p.starred)))
+                for ix, p in enumerate(path)
+            ),
         ]
         return "%s>%s:%s" % (
             self.source._to_str(False),

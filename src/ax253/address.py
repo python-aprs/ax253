@@ -67,6 +67,12 @@ class Address:
     """If true, indicates that this address has digipeated the packet."""
     # The high order bit of HLDC; True indicates end of address information.
     a7_hldc: bool = field(default=False, converter=bool, repr=False, kw_only=True)
+    starred: bool | None = field(default=None, repr=False, kw_only=True)
+    """
+    Whether the TNC2 text this address came from had a ``*``; None for an
+    address not read from text. A frame's ``str()`` keeps those marks, so
+    an APRS-IS line with a ``*`` on every used hop round-trips.
+    """
 
     @classmethod
     def from_bytes(cls, ax25_address: bytes, **kwargs: Any) -> Self:
@@ -116,6 +122,7 @@ class Address:
             ssid=ssid,
             digi=digi,
             a7_hldc=a7_hldc,
+            starred=digi,
         )
         if kwargs:
             init_kwargs.update(**kwargs)
