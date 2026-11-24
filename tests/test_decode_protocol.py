@@ -374,3 +374,34 @@ def test_sync_read_arguments_are_keyword_only(sync_server):
         with pytest.raises(TypeError):
             tnc.read(1)  # ty: ignore[too-many-positional-arguments]
         assert len(tnc.read(min_frames=1)) >= 1
+
+
+# --- ax253#32: iteration ---
+
+
+def test_protocol_async_for_reads_until_eof():
+    async def main():
+        payload = b"\r\n".join(LINES) + b"\r\n"
+        async with tnc2_peer(payload, close_after_send=True) as (port, _, _):
+            _, protocol = await _connect(port)
+            return [f async for f in protocol]
+
+    assert [f.info for f in asyncio.run(main())] == [b">one", b">two", b">three"]
+
+
+def test_sync_wrapper_iterates_until_eof():
+    import socket
+    import threading
+
+    listener = socket.create_server(("127.0.0.1", 0))
+
+    def serve():
+        conn, _ = listener.accept()
+        conn.sendall(b"\r\n".join(LINES) + b"\r\n")
+        conn.close()
+        listener.close()
+
+    threading.Thread(target=serve, daemon=True).start()
+    with SyncTNC2(listener.getsockname()[1]) as tnc:
+        assert isinstance(tnc, SyncTNC2)
+        assert [f.info for f in tnc] == [b">one", b">two", b">three"]
