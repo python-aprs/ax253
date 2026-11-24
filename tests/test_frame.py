@@ -275,3 +275,23 @@ def test_long_frame_split_across_reads_is_kept():
     encoded = hdlc(F1)
     assert list(decoder.update(encoded[:10])) == []
     assert list(decoder.update(encoded[10:])) == [F1]
+
+
+# --- issue #28: frames are hashable ---
+
+
+def test_frames_are_hashable():
+    same = Frame.from_bytes(bytes(F1))
+    assert same == F1
+    assert hash(same) == hash(F1)
+    assert len({F1, same, F2, F3}) == 3
+
+
+def test_path_is_a_tuple_whatever_it_was_built_from():
+    frame = Frame(
+        destination=F1.destination,
+        source=F1.source,
+        path=[Address.from_str("WIDE1-1")],
+    )
+    assert isinstance(frame.path, tuple)
+    assert attr.evolve(frame, path=[]).path == ()
