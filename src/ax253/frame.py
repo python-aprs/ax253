@@ -321,7 +321,14 @@ class AX25BytestreamDecoder(GenericDecoder[Frame]):
     before the bytes are dropped as corrupt.
     """
 
+    max_buffered_bytes: int = field(default=4 * MAX_FRAME_WITH_FCS, kw_only=True)
+    """
+    Most bytes kept while waiting for a flag. Past this, the buffered bytes
+    are dropped up to the next flag, so a stream with no flags (the wrong
+    baud rate, the wrong service on the port) can't grow without limit.
+    """
     _last_pframe: bytes = field(default=b"", init=False)
+    _discarding: bool = field(default=False, init=False, repr=False)
 
     @staticmethod
     def decode_frames(frame: bytes) -> Iterable[Frame]:
@@ -365,6 +372,12 @@ class AX25BytestreamDecoder(GenericDecoder[Frame]):
         :return: an iterable of decoded frames
         """
         data, self._last_pframe = self._last_pframe + new_data, b""
+        if self._discarding:
+            # skip the rest of an overlong run of bytes, up to the next flag
+            flag = data.find(AX25_FLAG)
+            if flag < 0:
+                return
+            data, self._discarding = data[flag:], False
         start = self._skip_flags(data, 0)
         while start < len(data):
             end = data.find(AX25_FLAG, start)
@@ -404,6 +417,9 @@ class AX25BytestreamDecoder(GenericDecoder[Frame]):
             _logger.debug("Dropping frame with bad FCS: %r", data[start:end])
             start = next_start
         self._last_pframe = data[start:]
+        if len(self._last_pframe) > self.max_buffered_bytes:
+            _logger.debug("Dropping %d bytes without a flag", len(self._last_pframe))
+            self._last_pframe, self._discarding = b"", True
 
     def flush(self) -> Iterable[Frame]:
         """
@@ -412,6 +428,7 @@ class AX25BytestreamDecoder(GenericDecoder[Frame]):
         Buffered bytes are decoded only if they end in a valid FCS.
         """
         buffered, self._last_pframe = self._last_pframe, b""
+        self._discarding = False
         payload = self._check(buffered)
         if payload is not None:
             yield from self._decode_payload(payload)
