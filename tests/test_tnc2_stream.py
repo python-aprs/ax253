@@ -132,3 +132,29 @@ def test_address_invalid_text(bad):
 def test_address_ssid_range_enforced():
     with pytest.raises(ValueError):
         Address(callsign=b"N0CALL", ssid=16)
+
+
+# --- issue #27: a stream with no line ends can't grow the buffer forever ---
+
+
+def test_buffer_is_bounded_without_line_ends():
+    decoder = TNC2Decode()
+    for _ in range(100):
+        assert list(decoder.update(b"A" * 1000)) == []
+        assert len(decoder._buffer) <= decoder.max_line_length
+
+
+def test_overlong_line_is_dropped_whole():
+    decoder = TNC2Decode(max_line_length=64)
+    assert list(decoder.update(b"X" * 100)) == []
+    # the tail of the dropped line must not decode as a packet of its own
+    frames = list(decoder.update(b"N0CALL>APRS:>tail\r\nN0CALL>APRS:>ok\r\n"))
+    assert [str(f) for f in frames] == ["N0CALL>APRS:>ok"]
+
+
+def test_overlong_line_dropped_across_reads():
+    decoder = TNC2Decode(max_line_length=64)
+    assert list(decoder.update(b"X" * 100)) == []
+    assert list(decoder.update(b"Y" * 100)) == []
+    assert [str(f) for f in decoder.update(b"\nN0CALL>APRS:>ok\n")] == ["N0CALL>APRS:>ok"]
+    assert list(decoder.flush()) == []
