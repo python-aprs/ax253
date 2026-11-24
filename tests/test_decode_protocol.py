@@ -366,3 +366,11 @@ def test_protocol_queue_unbounded():
     p = asyncio.run(main())
     assert p.frames.qsize() == 20
     assert p.dropped_frames == 0
+
+
+def test_sync_read_arguments_are_keyword_only(sync_server):
+    port, _, _ = sync_server
+    with SyncTNC2(port) as tnc:
+        with pytest.raises(TypeError):
+            tnc.read(1)  # ty: ignore[too-many-positional-arguments]
+        assert len(tnc.read(min_frames=1)) >= 1

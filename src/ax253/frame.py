@@ -171,6 +171,7 @@ class Frame:
     @classmethod
     def ui(
         cls,
+        *,
         destination: Address | str,
         source: Address | str,
         path: Sequence[Address | str] | None = None,
@@ -178,6 +179,9 @@ class Frame:
     ) -> Self:
         """
         Create a UI frame with the given information.
+
+        The arguments are keyword-only: TNC2 text reads ``source>destination``,
+        so positional ``ui(destination, source)`` was easy to get backwards.
 
         Path entries follow the TNC2 monitor convention: a ``*`` marks the
         last digipeater that has repeated the frame, and every digipeater

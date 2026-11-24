@@ -249,3 +249,13 @@ def test_Frame_too_many_digipeaters():
     raw[70:70] = last
     with pytest.raises(ValueError, match="at most 8"):
         Frame.from_bytes(bytes(raw))
+
+
+# --- ax253#34: keyword-only ui() ---
+
+
+def test_ui_is_keyword_only():
+    with pytest.raises(TypeError):
+        Frame.ui("APRS", "N0CALL")  # ty: ignore[missing-argument, too-many-positional-arguments]
+    frame = Frame.ui(source="N0CALL", destination="APRS")
+    assert str(frame) == "N0CALL>APRS:"

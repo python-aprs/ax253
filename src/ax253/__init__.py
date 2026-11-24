@@ -35,7 +35,7 @@ N0CALL-7>APRS,WIDE1-1*,WIDE2-1:>On the air
 ``Frame.ui`` builds a new UI frame; the ``*`` convention marks digipeaters
 that have already repeated it:
 
->>> print(Frame.ui("APRS", "N0CALL", path=["WIDE1-1"], info=b">hello"))
+>>> print(Frame.ui(source="N0CALL", destination="APRS", path=["WIDE1-1"], info=b">hello"))
 N0CALL>APRS,WIDE1-1:>hello
 
 Addresses
@@ -47,6 +47,12 @@ Addresses
 (b'N0CALL', 7)
 >>> str(address)
 'N0CALL-7'
+
+Addresses compare by station (callsign, ignoring case, and SSID), and
+compare equal to their text:
+
+>>> frame.source == "n0call-7"
+True
 
 Streams
 =======

@@ -306,8 +306,9 @@ class SyncFrameDecode(abc.ABC, Generic[_T]):
 
     def read(
         self,
-        callback: Callable[[_T], None] | None = None,
+        *,
         min_frames: int | None = -1,
+        callback: Callable[[_T], None] | None = None,
     ) -> Sequence[_T]:
         """
         Read frames from underlying protocol.
