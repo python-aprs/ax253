@@ -38,6 +38,20 @@ __copyright__ = "Copyright (c) 2013 Christopher H. Casebeer. All rights reserved
 __license__ = "BSD 2-clause Simplified License"
 
 
+def _crc_table() -> tuple[int, ...]:
+    table = []
+    for byte in range(256):
+        crc = byte
+        for _ in range(8):
+            crc = (crc >> 1) ^ 0x8408 if crc & 1 else crc >> 1
+        table.append(crc)
+    return tuple(table)
+
+
+# CRC-16/X.25 (reflected polynomial 0x8408), one entry per input byte
+_CRC_TABLE = _crc_table()
+
+
 @define
 class FCS:
     fcs: int = field(default=0xFFFF)
@@ -52,10 +66,12 @@ class FCS:
     def update(self, data: bytes) -> "FCS":
         # AX.25 sends each octet least-significant bit first, and the FCS
         # (CRC-16/X.25, reflected polynomial 0x8408) is computed in that
-        # same order.
+        # same order: the same result as update_bit() for each bit, LSB
+        # first, a byte at a time from a lookup table.
+        crc, table = self.fcs, _CRC_TABLE
         for byte in data:
-            for i in range(8):
-                self.update_bit((byte >> i) & 0x01 == 1)
+            crc = (crc >> 8) ^ table[(crc ^ byte) & 0xFF]
+        self.fcs = crc
         return self
 
     def digest(self) -> bytes:
